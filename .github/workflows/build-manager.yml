@@ -189,13 +189,44 @@ jobs:
           path: "manager/app/build/outputs/mapping/release/"
 
   upload-manager:
-    needs: build-manager
+    needs: [generate-key, build-manager]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
       - name: Download gradle APK
         uses: actions/download-artifact@v8
         with:
           name: manager-gradle
+
+      - name: Sign APK with temp keystore
+        env:
+          PR_KEYSTORE: ${{ needs.generate-key.outputs.keystore }}
+          PR_KEYSTORE_PASSWORD: ${{ needs.generate-key.outputs.keystore_password }}
+          PR_KEY_PASSWORD: ${{ needs.generate-key.outputs.key_password }}
+        run: |
+          echo "$PR_KEYSTORE" | base64 -d > temp-key.jks
+          APK=$(ls *.apk | head -1)
+          echo "Signing $APK ..."
+          apksigner sign --ks temp-key.jks \
+            --ks-key-alias pr-key \
+            --ks-pass pass:"$PR_KEYSTORE_PASSWORD" \
+            --key-pass pass:"$PR_KEY_PASSWORD" \
+            "$APK"
+          echo "Signed: $APK"
+          ls -la "$APK"
 
       - name: Upload as manager artifact
         uses: actions/upload-artifact@v7
