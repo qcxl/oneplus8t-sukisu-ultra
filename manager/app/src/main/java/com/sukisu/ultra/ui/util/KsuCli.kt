@@ -37,7 +37,9 @@ import java.io.File
 private const val TAG = "KsuCli"
 
 fun getKsuDaemonPath(): String {
-    return ksuApp.applicationInfo.nativeLibraryDir + File.separator + "libksud.so"
+    // Prefer the system-installed ksud (at /data/adb/ksu/ksud) over bundled
+    // The app can exec this when SELinux is permissive (standard KSU setup)
+    return "/data/adb/ksu/ksud"
 }
 
 data class FlashResult(val code: Int, val err: String, val showReboot: Boolean) {

@@ -5,18 +5,30 @@ import android.net.Uri
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
 
 fun isSelinuxPermissive(): Boolean {
-    val result = Shell.cmd("getenforce").exec()
-    val output = result.out.joinToString("\n").trim().lowercase()
-    return output == "permissive"
+    return try {
+        val proc = Runtime.getRuntime().exec("getenforce")
+        val output = BufferedReader(InputStreamReader(proc.inputStream)).readText().trim().lowercase()
+        proc.waitFor()
+        output == "permissive"
+    } catch (e: Exception) {
+        false
+    }
 }
 
 fun setSelinuxPermissive(permissive: Boolean): Boolean {
     val target = if (permissive) "0" else "1"
-    val result = Shell.cmd("setenforce $target").exec()
-    return result.isSuccess
+    return try {
+        val proc = Runtime.getRuntime().exec("setenforce $target")
+        val exit = proc.waitFor()
+        exit == 0
+    } catch (e: Exception) {
+        false
+    }
 }
 
 suspend fun backupAllowlistToUri(context: Context, targetUri: Uri): Boolean = withContext(Dispatchers.IO) {

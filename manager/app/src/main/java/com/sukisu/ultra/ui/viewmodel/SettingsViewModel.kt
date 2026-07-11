@@ -234,29 +234,15 @@ class SettingsViewModel(
 
     fun setSuCompatMode(mode: Int) {
         viewModelScope.launch(Dispatchers.IO) {
-            when (mode) {
-                0 -> if (repo.setSuEnabled(true)) {
-                    repo.execKsudFeatureSave()
-                    repo.setSuCompatModePref(0)
-                    _uiState.update { it.copy(suCompatMode = 0, isSuEnabled = true) }
-                }
-
-                1 -> if (repo.setSuEnabled(true)) {
-                    repo.execKsudFeatureSave()
-                    if (repo.setSuEnabled(false)) {
-                        // "Disable until reboot" implies it should be enabled on next boot.
-                        // We set the preference to 0 (Enabled) to match the persistent state.
-                        repo.setSuCompatModePref(0)
-                        _uiState.update { it.copy(suCompatMode = 1, isSuEnabled = false) }
-                    }
-                }
-
-                2 -> if (repo.setSuEnabled(false)) {
-                    repo.execKsudFeatureSave()
-                    repo.setSuCompatModePref(2)
-                    _uiState.update { it.copy(suCompatMode = 2, isSuEnabled = false) }
-                }
+            repo.setSuEnabled(mode != 2)
+            if (mode == 1) {
+                // "Disable until reboot" — kernel disabled now, stays enabled after reboot
+                repo.setSuCompatModePref(0)
+            } else {
+                repo.setSuCompatModePref(mode)
             }
+            repo.execKsudFeatureSave()
+            _uiState.update { it.copy(suCompatMode = mode, isSuEnabled = mode != 2) }
         }
     }
 
@@ -298,19 +284,17 @@ class SettingsViewModel(
 
     fun setSulogEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
-            if (repo.setSulogEnabled(enabled)) {
-                repo.execKsudFeatureSave()
-                _uiState.update { it.copy(isSulogEnabled = enabled) }
-            }
+            repo.setSulogEnabled(enabled)
+            repo.execKsudFeatureSave()
+            _uiState.update { it.copy(isSulogEnabled = enabled) }
         }
     }
 
     fun setAdbRootEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
-            if (repo.setAdbRootEnabled(enabled)) {
-                repo.execKsudFeatureSave()
-                _uiState.update { it.copy(isAdbRootEnabled = enabled) }
-            }
+            repo.setAdbRootEnabled(enabled)
+            repo.execKsudFeatureSave()
+            _uiState.update { it.copy(isAdbRootEnabled = enabled) }
         }
     }
 
