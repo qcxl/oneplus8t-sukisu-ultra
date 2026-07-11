@@ -76,23 +76,39 @@ fun Uri.getFileName(context: Context): String? {
 fun createRootShell(globalMnt: Boolean = false): Shell {
     Shell.enableVerboseLogging = BuildConfig.DEBUG
     val builder = Shell.Builder.create()
+    val ksuBin = "/data/adb/ksu/bin/ksud"
     return try {
-        if (globalMnt) {
-            builder.build(getKsuDaemonPath(), "debug", "su", "-g")
+        // Try system ksud first (already has KSU fd, bypasses apk_sign.c)
+        if (File(ksuBin).canExecute()) {
+            if (globalMnt) {
+                builder.build(ksuBin, "debug", "su", "-g")
+            } else {
+                builder.build(ksuBin, "debug", "su")
+            }
         } else {
-            builder.build(getKsuDaemonPath(), "debug", "su")
+            throw RuntimeException("system ksud not found")
         }
     } catch (e: Throwable) {
-        Log.w(TAG, "ksu failed: ", e)
+        Log.w(TAG, "system ksud failed: ", e)
         try {
+            // Fallback to bundled ksud (works if signature matches)
             if (globalMnt) {
-                builder.build("su", "-mm")
+                builder.build(getKsuDaemonPath(), "debug", "su", "-g")
             } else {
-                builder.build("su")
+                builder.build(getKsuDaemonPath(), "debug", "su")
             }
         } catch (e: Throwable) {
-            Log.e(TAG, "su failed: ", e)
-            builder.build("sh")
+            Log.w(TAG, "bundled ksud failed: ", e)
+            try {
+                if (globalMnt) {
+                    builder.build("su", "-mm")
+                } else {
+                    builder.build("su")
+                }
+            } catch (e: Throwable) {
+                Log.e(TAG, "su failed: ", e)
+                builder.build("sh")
+            }
         }
     }
 }
