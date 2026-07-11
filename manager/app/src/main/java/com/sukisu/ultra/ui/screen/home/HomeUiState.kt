@@ -49,7 +49,7 @@ data class HomeUiState(
         get() = isManager && !isManagerPrBuild && isKernelPrBuild
 
     val showVersionMismatchWarning: Boolean
-        get() = ksuVersion != null && ksuVersion.toLong() < currentManagerVersionCode
+        get() = false // cosmetic; real compat check is showRequireKernelWarning
 
     val hasUpdate: Boolean
         get() = latestVersionInfo.versionCode > currentManagerVersionCode

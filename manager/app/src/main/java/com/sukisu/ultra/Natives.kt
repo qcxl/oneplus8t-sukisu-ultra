@@ -153,7 +153,8 @@ object Natives {
 
     fun requireNewKernel(): Boolean {
         if (version != -1 && version < MINIMAL_SUPPORTED_KERNEL) return true
-        return (isVersionLessThan(getFullVersion(), MINIMAL_SUPPORTED_KERNEL_FULL)) || checkUAPIMismatch()
+        val fullVersion = getFullVersion() ?: return false
+        return isVersionLessThan(fullVersion, MINIMAL_SUPPORTED_KERNEL_FULL) || checkUAPIMismatch()
     }
 
     @Keep
