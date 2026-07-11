@@ -14,6 +14,8 @@ import com.topjohnwu.superuser.ipc.RootService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.TimeoutException
 import com.sukisu.zako.IKsuInterface
 import com.sukisu.ultra.Natives
 import com.sukisu.ultra.data.model.AppInfo
@@ -104,38 +106,40 @@ class SuperUserRepositoryImpl : SuperUserRepository {
     private suspend inline fun connectKsuService(
         crossinline onDisconnect: () -> Unit = {}
     ): Pair<IBinder, ServiceConnection> = withContext(Dispatchers.Main) {
-        suspendCancellableCoroutine { cont ->
-            val connection = object : ServiceConnection {
-                override fun onServiceDisconnected(name: ComponentName?) {
-                    onDisconnect()
-                }
+        withTimeout(15000L) {
+            suspendCancellableCoroutine { cont ->
+                val connection = object : ServiceConnection {
+                    override fun onServiceDisconnected(name: ComponentName?) {
+                        onDisconnect()
+                    }
 
-                override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                    if (cont.isActive) {
-                        cont.resume(binder as IBinder to this)
+                    override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                        if (cont.isActive) {
+                            cont.resume(binder as IBinder to this)
+                        }
                     }
                 }
-            }
 
-            cont.invokeOnCancellation {
-                if (Looper.myLooper() == Looper.getMainLooper()) {
-                    RootService.unbind(connection)
-                } else {
-                    Handler(Looper.getMainLooper()).post {
+                cont.invokeOnCancellation {
+                    if (Looper.myLooper() == Looper.getMainLooper()) {
                         RootService.unbind(connection)
+                    } else {
+                        Handler(Looper.getMainLooper()).post {
+                            RootService.unbind(connection)
+                        }
                     }
                 }
+
+                val intent = Intent(ksuApp, KsuService::class.java)
+
+                val task = RootService.bindOrTask(
+                    intent,
+                    Shell.EXECUTOR,
+                    connection,
+                )
+                val shell = KsuCli.SHELL
+                task?.let { shell.execTask(it) }
             }
-
-            val intent = Intent(ksuApp, KsuService::class.java)
-
-            val task = RootService.bindOrTask(
-                intent,
-                Shell.EXECUTOR,
-                connection,
-            )
-            val shell = KsuCli.SHELL
-            task?.let { shell.execTask(it) }
         }
     }
 }

@@ -38,7 +38,7 @@ suspend fun download(
 
 fun checkNewVersion(): LatestVersionInfo {
     if (!isNetworkAvailable(ksuApp)) return LatestVersionInfo()
-    val url = "https://api.github.com/repos/SukiSU-Ultra/SukiSU-Ultra/releases/latest"
+    val url = "https://api.github.com/repos/qcxl/oneplus8t-sukisu-ultra/releases/latest"
     // default null value if failed
     val defaultValue = LatestVersionInfo()
     runCatching {

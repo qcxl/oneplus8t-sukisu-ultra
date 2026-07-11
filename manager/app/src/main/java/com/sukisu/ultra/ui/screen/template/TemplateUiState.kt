@@ -5,7 +5,7 @@ import com.sukisu.ultra.data.model.TemplateInfo
 
 @Immutable
 data class TemplateUiState(
-    val isRefreshing: Boolean = false,
+    val isRefreshing: Boolean = true,
     val offline: Boolean = false,
     val templates: List<TemplateInfo> = emptyList(),
     val templateList: List<TemplateInfo> = emptyList(),

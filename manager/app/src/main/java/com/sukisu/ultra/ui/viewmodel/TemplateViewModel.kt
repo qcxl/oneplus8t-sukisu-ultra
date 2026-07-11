@@ -49,7 +49,8 @@ class TemplateViewModel(
                     it.copy(
                         templates = templates,
                         templateList = sorted,
-                        isRefreshing = false
+                        isRefreshing = false,
+                        offline = sorted.isEmpty()
                     )
                 }
             }.onFailure { e ->

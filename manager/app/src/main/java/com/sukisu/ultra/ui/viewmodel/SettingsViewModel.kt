@@ -262,10 +262,9 @@ class SettingsViewModel(
 
     fun setKernelUmountEnabled(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
-            if (repo.setKernelUmountEnabled(enabled)) {
-                repo.execKsudFeatureSave()
-                _uiState.update { it.copy(isKernelUmountEnabled = enabled) }
-            }
+            repo.setKernelUmountEnabled(enabled)
+            repo.execKsudFeatureSave()
+            _uiState.update { it.copy(isKernelUmountEnabled = enabled) }
         }
     }
 
@@ -317,9 +316,9 @@ class SettingsViewModel(
 
     fun setDefaultUmountModules(enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
-            if (repo.setDefaultUmountModules(enabled)) {
-                _uiState.update { it.copy(isDefaultUmountModules = enabled) }
-            }
+            repo.setDefaultUmountModules(enabled)
+            repo.execKsudFeatureSave()
+            _uiState.update { it.copy(isDefaultUmountModules = enabled) }
         }
     }
 }
