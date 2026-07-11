@@ -189,7 +189,7 @@ jobs:
           path: "manager/app/build/outputs/mapping/release/"
 
   upload-manager:
-    needs: [generate-key, build-manager]
+    needs: [generate-key, build-manager, build-ksud]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -210,6 +210,27 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: manager-gradle
+
+      - name: Download ksud binary
+        uses: actions/download-artifact@v8
+        with:
+          name: ksud-aarch64-linux-android
+          path: /tmp/ksud-bin
+
+      - name: Repack APK with libksud.so
+        run: |
+          APK=$(ls *.apk | head -1)
+          echo "Repacking $APK ..."
+          if [ -f /tmp/ksud-bin/ksud ]; then
+            mkdir -p lib/arm64-v8a
+            cp /tmp/ksud-bin/ksud lib/arm64-v8a/libksud.so
+            # libadbroot.so is already in the APK from Gradle build
+            zip -r "$APK" lib/
+            echo "libksud.so injected successfully"
+            rm -rf lib/
+          else
+            echo "WARNING: ksud binary not found, continuing without repack"
+          fi
 
       - name: Sign APK with temp keystore
         if: github.event_name == 'pull_request'
