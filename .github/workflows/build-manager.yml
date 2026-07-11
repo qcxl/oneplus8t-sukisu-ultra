@@ -217,10 +217,22 @@ jobs:
           PR_KEYSTORE_PASSWORD: ${{ needs.generate-key.outputs.keystore_password }}
           PR_KEY_PASSWORD: ${{ needs.generate-key.outputs.key_password }}
         run: |
+          # Locate apksigner in Android SDK (setup-android may not add build-tools to PATH)
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f 2>/dev/null | head -1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "apksigner not found in SDK, installing build-tools..."
+            yes | sdkmanager "build-tools;35.0.0" 2>/dev/null || true
+            APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f 2>/dev/null | head -1)"
+          fi
+          if [ -z "$APKSIGNER" ]; then
+            echo "ERROR: apksigner not found even after installation"
+            exit 1
+          fi
+          echo "Using apksigner: $APKSIGNER"
           echo "$PR_KEYSTORE" | base64 -d > temp-key.jks
           APK=$(ls *.apk | head -1)
           echo "Signing $APK ..."
-          apksigner sign --ks temp-key.jks \
+          "$APKSIGNER" sign --ks temp-key.jks \
             --ks-key-alias pr-key \
             --ks-pass pass:"$PR_KEYSTORE_PASSWORD" \
             --key-pass pass:"$PR_KEY_PASSWORD" \
