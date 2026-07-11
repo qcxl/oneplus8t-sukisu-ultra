@@ -21,6 +21,8 @@ import com.topjohnwu.superuser.Shell
 import com.topjohnwu.superuser.ShellUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import kotlinx.parcelize.Parcelize
 import com.sukisu.ultra.BuildConfig
 import com.sukisu.ultra.Natives
@@ -111,28 +113,34 @@ fun createRootShell(globalMnt: Boolean = false): Shell {
     }
 }
 
-fun execKsud(args: String, newShell: Boolean = false): Boolean {
-    return if (newShell) {
-        withNewRootShell {
-            ShellUtils.fastCmdResult(this, "${getKsuDaemonPath()} $args")
-        }
-    } else {
-        ShellUtils.fastCmdResult(getRootShell(), "${getKsuDaemonPath()} $args")
+fun ksudExec(args: String, captureOutput: Boolean = false): Pair<Int, String> {
+    return try {
+        val cmd = "${getKsuDaemonPath()} $args"
+        val proc = Runtime.getRuntime().exec(cmd)
+        val output = if (captureOutput) {
+            BufferedReader(InputStreamReader(proc.inputStream)).readText().trim()
+        } else ""
+        val exitCode = proc.waitFor()
+        exitCode to output
+    } catch (e: Exception) {
+        Log.e(TAG, "ksudExec failed: $args", e)
+        -1 to ""
     }
 }
 
+fun execKsud(args: String, newShell: Boolean = false): Boolean {
+    val (exitCode, _) = ksudExec(args)
+    return exitCode == 0
+}
+
 suspend fun getFeatureStatus(feature: String): String = withContext(Dispatchers.IO) {
-    val shell = getRootShell()
-    val out = shell.newJob()
-        .add("${getKsuDaemonPath()} feature check $feature").to(ArrayList<String>(), null).exec().out
-    out.firstOrNull()?.trim().orEmpty()
+    val (_, output) = ksudExec("feature check $feature", captureOutput = true)
+    output.lines().firstOrNull()?.trim().orEmpty()
 }
 
 suspend fun getFeaturePersistValue(feature: String): Long? = withContext(Dispatchers.IO) {
-    val shell = getRootShell()
-    val out = shell.newJob()
-        .add("${getKsuDaemonPath()} feature get --config $feature").to(ArrayList<String>(), null).exec().out
-    val valueLine = out.firstOrNull { it.trim().startsWith("Value:") } ?: return@withContext null
+    val (_, output) = ksudExec("feature get --config $feature", captureOutput = true)
+    val valueLine = output.lines().firstOrNull { it.trim().startsWith("Value:") } ?: return@withContext null
     valueLine.substringAfter("Value:").trim().toLongOrNull()
 }
 
@@ -494,36 +502,27 @@ fun setSepolicy(pkg: String, rules: String): Boolean {
 }
 
 fun listAppProfileTemplates(): List<String> {
-    val shell = getRootShell()
-    return shell.newJob().add("${getKsuDaemonPath()} profile list-templates").to(ArrayList(), null)
-        .exec().out
+    val (_, output) = ksudExec("profile list-templates", captureOutput = true)
+    return output.lines().filter { it.isNotBlank() }
 }
 
 fun getAppProfileTemplate(id: String): String {
-    val shell = getRootShell()
-    return shell.newJob().add("${getKsuDaemonPath()} profile get-template '${id}'")
-        .to(ArrayList(), null).exec().out.joinToString("\n")
+    val (_, output) = ksudExec("profile get-template '$id'", captureOutput = true)
+    return output
 }
 
 fun setAppProfileTemplate(id: String, template: String): Boolean {
-    val shell = getRootShell()
-    val escapedTemplate = template.replace("\"", "\\\"")
-    val cmd = """${getKsuDaemonPath()} profile set-template "$id" "$escapedTemplate'""""
-    return shell.newJob().add(cmd)
-        .to(ArrayList(), null).exec().isSuccess
+    val escaped = template.replace("'", "'\\''")
+    return execKsud("profile set-template '$id' '$escaped'")
 }
 
 fun deleteAppProfileTemplate(id: String): Boolean {
-    val shell = getRootShell()
-    return shell.newJob().add("${getKsuDaemonPath()} profile delete-template '${id}'")
-        .to(ArrayList(), null).exec().isSuccess
+    return execKsud("profile delete-template '$id'")
 }
 
 fun forceStopApp(packageName: String, userId: Int? = null) {
-    val shell = getRootShell()
     val userArg = userId?.let { " --user $it" } ?: ""
-    val result = shell.newJob().add("am force-stop$userArg $packageName").exec()
-    Log.i(TAG, "force stop $packageName result: $result")
+    execKsud("debug exec am force-stop$userArg $packageName")
 }
 
 fun launchApp(packageName: String, userId: Int? = null) {
