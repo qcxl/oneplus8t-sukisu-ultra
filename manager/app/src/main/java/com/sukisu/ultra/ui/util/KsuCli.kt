@@ -78,20 +78,18 @@ fun createRootShell(globalMnt: Boolean = false): Shell {
     val builder = Shell.Builder.create()
     val ksuBin = "/data/adb/ksu/bin/ksud"
     return try {
-        // Try system ksud first (already has KSU fd, bypasses apk_sign.c)
-        if (File(ksuBin).canExecute()) {
-            if (globalMnt) {
-                builder.build(ksuBin, "debug", "su", "-g")
-            } else {
-                builder.build(ksuBin, "debug", "su")
-            }
+        // On Android 14+ (API 34+), File.canExecute() on paths under /data/adb/
+        // returns false due to app isolation, even when execution would succeed.
+        // Try both paths directly, skip canExecute() pre-check.
+        if (globalMnt) {
+            builder.build(ksuBin, "debug", "su", "-g")
         } else {
-            throw RuntimeException("system ksud not found")
+            builder.build(ksuBin, "debug", "su")
         }
     } catch (e: Throwable) {
         Log.w(TAG, "system ksud failed: ", e)
         try {
-            // Fallback to bundled ksud (works if signature matches)
+            // Fallback to bundled ksud (in app's native lib dir, always accessible)
             if (globalMnt) {
                 builder.build(getKsuDaemonPath(), "debug", "su", "-g")
             } else {
@@ -408,6 +406,8 @@ fun reboot(reason: String = "") {
 }
 
 fun rootAvailable(): Boolean {
+    // If KSU native communication works, root is definitely available
+    if (Natives.version > 0 || Natives.kernelUAPIVersion > 0) return true
     val shell = getRootShell()
     return shell.isRoot
 }
