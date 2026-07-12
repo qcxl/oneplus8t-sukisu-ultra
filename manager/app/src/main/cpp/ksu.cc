@@ -16,7 +16,6 @@
 #include <climits>
 #include <sys/syscall.h>
 #include <cerrno>
-#include <fcntl.h>
 #include "ksu.h"
 
 static int fd = -1;
@@ -64,10 +63,17 @@ static inline int scan_driver_fd() {
     return found;
 }
 
-static inline int open_ksu_dev() {
-    int dev_fd = open("/dev/ksu", O_RDONLY | O_CLOEXEC);
-    if (dev_fd >= 0) {
-        return dev_fd;
+static inline int install_ksu_fd() {
+    // Use prctl(0xDEADBEEF, 0xCAFEBABE, &fd, 0, 0) to request fd from kernel.
+    // This is the only way to get a ksu fd when /dev/ksu doesn't exist
+    // (built-in/LKM mode without misc device node).
+    int installed_fd = -1;
+    int ret = prctl(static_cast<int>(0xDEADBEEF),
+                    static_cast<int>(0xCAFEBABE),
+                    reinterpret_cast<unsigned long>(&installed_fd),
+                    0, 0);
+    if (ret == 0 && installed_fd >= 0) {
+        return installed_fd;
     }
     return -1;
 }
@@ -79,7 +85,7 @@ static int ksuctl(unsigned long op, Args &&... args) {
         fd = scan_driver_fd();
     }
     if (fd < 0) {
-        fd = open_ksu_dev();
+        fd = install_ksu_fd();
     }
 
     static_assert(sizeof...(Args) <= 1, "ioctl expects at most one extra argument");
