@@ -13,83 +13,94 @@
 #include <cstdlib>
 
 #include <unistd.h>
+#include <sys/stat.h>
 #include <climits>
-#include <sys/syscall.h>
 #include <cerrno>
 #include "ksu.h"
 
 static int fd = -1;
 
-static inline int scan_driver_fd() {
-    const char *kName = "[ksu_driver]";
-    DIR *dir = opendir("/proc/self/fd");
-    if (!dir) {
-        return -1;
+static int preset_fd = -1;
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sukisu_ultra_Natives_setKsuFd(JNIEnv *env, jclass, jint ksu_fd) {
+    preset_fd = ksu_fd;
+    if (ksu_fd >= 0) {
+        fd = ksu_fd;
     }
-
-    int found = -1;
-    struct dirent *de;
-    char path[64];
-    char target[PATH_MAX];
-
-    while ((de = readdir(dir)) != nullptr) {
-        if (de->d_name[0] == '.') {
-            continue;
-        }
-
-        char *endptr = nullptr;
-        long fd_long = strtol(de->d_name, &endptr, 10);
-        if (!de->d_name[0] || *endptr != '\0' || fd_long < 0 || fd_long > INT_MAX) {
-            continue;
-        }
-
-        snprintf(path, sizeof(path), "/proc/self/fd/%s", de->d_name);
-        ssize_t n = readlink(path, target, sizeof(target) - 1);
-        if (n < 0) {
-            continue;
-        }
-        target[n] = '\0';
-
-        const char *base = strrchr(target, '/');
-        base = base ? base + 1 : target;
-
-        if (strstr(base, kName)) {
-            found = (int)fd_long;
-            break;
-        }
-    }
-
-    closedir(dir);
-    return found;
 }
 
-static inline int install_ksu_fd() {
-    // Use prctl(0xDEADBEEF, 0xCAFEBABE, &fd, 0, 0) to request fd from kernel.
-    // This is the only way to get a ksu fd when /dev/ksu doesn't exist
-    // (built-in/LKM mode without misc device node).
-    int installed_fd = -1;
-    int ret = prctl(static_cast<int>(0xDEADBEEF),
-                    static_cast<int>(0xCAFEBABE),
-                    reinterpret_cast<unsigned long>(&installed_fd),
-                    0, 0);
-    if (ret == 0 && installed_fd >= 0) {
-        return installed_fd;
+static bool is_ksu_present() {
+    struct stat st;
+    return stat("/sys/module/kernelsu", &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+static inline int scan_driver_fd() {
+    // First: scan /proc/self/fd for [ksu_driver] anon inode
+    const char *kName = "[ksu_driver]";
+    DIR *dir = opendir("/proc/self/fd");
+    if (dir) {
+        struct dirent *de;
+        char path[64];
+        char target[PATH_MAX];
+
+        while ((de = readdir(dir)) != nullptr) {
+            if (de->d_name[0] == '.') continue;
+
+            char *endptr = nullptr;
+            long fd_long = strtol(de->d_name, &endptr, 10);
+            if (!de->d_name[0] || *endptr != '\0' || fd_long < 0 || fd_long > INT_MAX) continue;
+
+            snprintf(path, sizeof(path), "/proc/self/fd/%s", de->d_name);
+            ssize_t n = readlink(path, target, sizeof(target) - 1);
+            if (n < 0) continue;
+            target[n] = '\0';
+
+            const char *base = strrchr(target, '/');
+            base = base ? base + 1 : target;
+
+            if (strstr(base, kName)) {
+                closedir(dir);
+                return (int)fd_long;
+            }
+        }
+        closedir(dir);
     }
+
+    // Fallback 1: preset fd set via JNI (setKsuFd from Kotlin ksu_fd_helper)
+    if (preset_fd >= 0) {
+        return preset_fd;
+    }
+
+    // Fallback 2: request fd via prctl(0xDEADBEEF, 0xCAFEBABE, ...)
+    {
+        int ksu_fd = -1;
+        prctl(static_cast<int>(0xDEADBEEF),
+              static_cast<int>(0xCAFEBABE),
+              reinterpret_cast<unsigned long>(&ksu_fd), 0, 0);
+        if (ksu_fd >= 0) return ksu_fd;
+    }
+
+    // Fallback 3: read from well-known file (written by root shell helper)
+    FILE *f = fopen("/data/local/tmp/ksu_fd", "r");
+    if (f) {
+        int file_fd = -1;
+        if (fscanf(f, "%d", &file_fd) == 1 && file_fd >= 0) {
+            fclose(f);
+            return file_fd;
+        }
+        fclose(f);
+    }
+
     return -1;
 }
 
 template<typename... Args>
 static int ksuctl(unsigned long op, Args &&... args) {
-
     if (fd < 0) {
         fd = scan_driver_fd();
     }
-    if (fd < 0) {
-        fd = install_ksu_fd();
-    }
-
     static_assert(sizeof...(Args) <= 1, "ioctl expects at most one extra argument");
-
     return ioctl(fd, op, std::forward<Args>(args)...);
 }
 
