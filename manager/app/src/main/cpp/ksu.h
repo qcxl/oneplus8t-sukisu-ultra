@@ -51,6 +51,11 @@ int set_selinux_hide_enabled(bool enabled);
 
 bool is_selinux_hide_enabled();
 
+// SELinux enforce toggle (kernel ioctl, no root shell needed)
+bool set_selinux_enforce(bool enforce);
+
+bool is_selinux_enforce();
+
 bool get_allow_list(struct ksu_new_get_allow_list_cmd *);
 
 bool get_full_version(char* buff);

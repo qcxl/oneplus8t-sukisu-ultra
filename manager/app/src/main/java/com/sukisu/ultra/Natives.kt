@@ -113,6 +113,16 @@ object Natives {
     external fun setSelinuxHideEnabled(enabled: Boolean): Int
 
     /**
+     * SELinux enforcing mode control via kernel ioctl (bypasses root shell).
+     * Returns true on success, false on failure.
+     */
+    external fun setSelinuxEnforce(enforce: Boolean): Boolean
+    /**
+     * Returns true if SELinux is Enforcing, false if Permissive.
+     */
+    external fun isSelinuxEnforce(): Boolean
+
+    /**
      * Get the user name for the uid.
      */
     external fun getUserName(uid: Int): String?

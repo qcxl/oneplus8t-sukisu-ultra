@@ -235,6 +235,22 @@ bool is_selinux_hide_enabled() {
     return value != 0;
 }
 
+bool set_selinux_enforce(bool enforce) {
+    return set_feature(KSU_FEATURE_SET_SELINUX_ENFORCE, enforce ? 1 : 0);
+}
+
+bool is_selinux_enforce() {
+    uint64_t value = 0;
+    bool supported = false;
+    if (!get_feature(KSU_FEATURE_SET_SELINUX_ENFORCE, &value, &supported)) {
+        return true;
+    }
+    if (!supported) {
+        return true;
+    }
+    return value != 0;
+}
+
 // Custom
 DEFINE_CACHED_GETTER(full_version, KSU_IOCTL_GET_FULL_VERSION, ksu_get_full_version_cmd, version_full, 255)
 DEFINE_CACHED_GETTER(hook_type, KSU_IOCTL_HOOK_TYPE, ksu_hook_type_cmd, hook_type, 32)

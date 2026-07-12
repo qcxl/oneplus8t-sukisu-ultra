@@ -1,9 +1,13 @@
 package com.sukisu.ultra.ui.util
 
+import com.sukisu.ultra.Natives
 import java.io.File
 
 fun getSELinuxStatusRaw(): String {
     if (!File("/sys/fs/selinux").exists()) return "Disabled"
+    try {
+        return if (Natives.isSelinuxEnforce()) "Enforcing" else "Permissive"
+    } catch (_: Exception) {}
     try {
         val value = File("/sys/fs/selinux/enforce").readText().trim()
         if (value == "0") return "Permissive"

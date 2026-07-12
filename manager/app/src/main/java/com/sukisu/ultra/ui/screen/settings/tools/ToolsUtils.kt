@@ -3,6 +3,7 @@ package com.sukisu.ultra.ui.screen.settings.tools
 import android.content.Context
 import android.net.Uri
 import com.topjohnwu.superuser.Shell
+import com.sukisu.ultra.Natives
 import com.sukisu.ultra.ui.util.ksudExecShell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,6 +13,11 @@ import java.io.IOException
 import java.io.InputStreamReader
 
 fun isSelinuxPermissive(): Boolean {
+    // Method 1: kernel IOCTL (KSU_FEATURE_SET_SELINUX_ENFORCE = 5) — bypasses root shell
+    try {
+        return !Natives.isSelinuxEnforce()
+    } catch (_: Exception) {}
+    // Method 2: direct sysfs read (world-readable)
     try {
         val value = java.io.File("/sys/fs/selinux/enforce").useLines { lines ->
             lines.firstOrNull()?.trim()
@@ -19,27 +25,33 @@ fun isSelinuxPermissive(): Boolean {
         if (value == "0") return true
         if (value == "1") return false
     } catch (_: Exception) {}
+    // Method 3: getenforce via Runtime.exec
     try {
         val proc = Runtime.getRuntime().exec("getenforce")
         val output = proc.inputStream.bufferedReader().readText().trim().lowercase()
         proc.waitFor()
         if (output == "permissive") return true
     } catch (_: Exception) {}
+    // Method 4: ksud root shell
     val (_, out) = ksudExecShell("cat /sys/fs/selinux/enforce")
     return out.trim() == "0"
 }
 
 fun setSelinuxPermissive(permissive: Boolean): Boolean {
     val target = if (permissive) "0" else "1"
-    // Method 1: write /sys/fs/selinux/enforce directly (world-writable with KSU policy)
+    // Method 1: kernel IOCTL (KSU_FEATURE_SET_SELINUX_ENFORCE = 5) — bypasses root shell entirely
+    try {
+        if (Natives.setSelinuxEnforce(!permissive)) return true
+    } catch (_: Exception) {}
+    // Method 2: write /sys/fs/selinux/enforce directly (world-writable with KSU policy)
     try {
         java.io.File("/sys/fs/selinux/enforce").writeText(target)
         return true
     } catch (_: Exception) {}
-    // Method 2: ksud root shell pipe
+    // Method 3: ksud root shell pipe
     val (ec1, _) = ksudExecShell("setenforce $target")
     if (ec1 == 0) return true
-    // Method 3: try su -c directly
+    // Method 4: try su -c directly
     try {
         val proc = Runtime.getRuntime().exec("su -c setenforce $target")
         if (proc.waitFor() == 0) return true
