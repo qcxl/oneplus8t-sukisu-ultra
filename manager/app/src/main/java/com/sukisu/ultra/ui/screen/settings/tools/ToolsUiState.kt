@@ -6,6 +6,7 @@ import androidx.compose.runtime.Immutable
 data class ToolsUiState(
     val selinuxEnforcing: Boolean = true,
     val selinuxLoading: Boolean = true,
+    val selinuxStatusDisplay: String = "Enforcing",
 )
 
 @Immutable

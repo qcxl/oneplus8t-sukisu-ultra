@@ -17,6 +17,7 @@ import com.sukisu.ultra.ui.LocalUiMode
 import com.sukisu.ultra.ui.UiMode
 import com.sukisu.ultra.ui.navigation3.LocalNavigator
 import com.sukisu.ultra.ui.navigation3.Route
+import com.sukisu.ultra.ui.util.getSELinuxStatusRaw
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,6 +31,7 @@ fun ToolsScreen() {
 
     var selinuxEnforcing by remember { mutableStateOf(true) }
     var selinuxLoading by remember { mutableStateOf(true) }
+    var selinuxStatusDisplay by remember { mutableStateOf("Enforcing") }
 
     val backupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -66,6 +68,7 @@ fun ToolsScreen() {
     LaunchedEffect(Unit) {
         val current = withContext(Dispatchers.IO) { !isSelinuxPermissive() }
         selinuxEnforcing = current
+        selinuxStatusDisplay = withContext(Dispatchers.IO) { getSELinuxStatusRaw() }
         selinuxLoading = false
     }
 
@@ -78,6 +81,7 @@ fun ToolsScreen() {
                 val actual = !isSelinuxPermissive()
                 withContext(Dispatchers.Main) {
                     selinuxEnforcing = actual
+                    selinuxStatusDisplay = if (actual) "Enforcing" else "Permissive"
                     selinuxLoading = false
                     Toast.makeText(
                         context,
@@ -107,7 +111,8 @@ fun ToolsScreen() {
 
     val state = ToolsUiState(
         selinuxEnforcing = selinuxEnforcing,
-        selinuxLoading = selinuxLoading
+        selinuxLoading = selinuxLoading,
+        selinuxStatusDisplay = selinuxStatusDisplay,
     )
 
     when (LocalUiMode.current) {

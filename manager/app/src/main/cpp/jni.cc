@@ -380,6 +380,30 @@ Java_com_sukisu_ultra_Natives_isSelinuxEnforce(JNIEnv *env, jobject thiz) {
 }
 
 extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_sukisu_ultra_Natives_setSulogEnabled(JNIEnv *env, jobject thiz, jboolean enabled) {
+    return set_sulog_enabled(enabled);
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_sukisu_ultra_Natives_isSulogEnabled(JNIEnv *env, jobject thiz) {
+    return is_sulog_enabled();
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_sukisu_ultra_Natives_setAdbRootEnabled(JNIEnv *env, jobject thiz, jboolean enabled) {
+    return set_adb_root_enabled(enabled);
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_sukisu_ultra_Natives_isAdbRootEnabled(JNIEnv *env, jobject thiz) {
+    return is_adb_root_enabled();
+}
+
+extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_sukisu_ultra_Natives_getUserName(JNIEnv *env, jobject thiz, jint uid) {
     struct passwd *pw = getpwuid((uid_t) uid);

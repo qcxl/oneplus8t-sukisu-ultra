@@ -56,6 +56,16 @@ bool set_selinux_enforce(bool enforce);
 
 bool is_selinux_enforce();
 
+// SU Log (KSU_FEATURE_SULOG = 2)
+bool set_sulog_enabled(bool enabled);
+
+bool is_sulog_enabled();
+
+// ADB Root (KSU_FEATURE_ADB_ROOT = 3)
+bool set_adb_root_enabled(bool enabled);
+
+bool is_adb_root_enabled();
+
 bool get_allow_list(struct ksu_new_get_allow_list_cmd *);
 
 bool get_full_version(char* buff);

@@ -99,6 +99,7 @@ fun ToolsMiuix(
                     SelinuxToggleSectionMiuix(
                         selinuxEnforcing = state.selinuxEnforcing,
                         selinuxLoading = state.selinuxLoading,
+                        selinuxStatusDisplay = state.selinuxStatusDisplay,
                         onSelinuxToggle = actions.onSelinuxToggle
                     )
 
@@ -136,6 +137,7 @@ fun ToolsMiuix(
 private fun SelinuxToggleSectionMiuix(
     selinuxEnforcing: Boolean,
     selinuxLoading: Boolean,
+    selinuxStatusDisplay: String,
     onSelinuxToggle: (Boolean) -> Unit
 ) {
     Card(
@@ -143,12 +145,9 @@ private fun SelinuxToggleSectionMiuix(
             .padding(top = 12.dp)
             .fillMaxWidth(),
     ) {
-        val statusLabel by produceState(initialValue = "Unknown") {
-            value = withContext(Dispatchers.IO) { getSELinuxStatusRaw() }
-        }
         SwitchPreference(
             title = stringResource(R.string.tools_selinux_toggle),
-            summary = stringResource(R.string.tools_selinux_summary, statusLabel),
+            summary = stringResource(R.string.tools_selinux_summary, selinuxStatusDisplay),
             startAction = {
                 Icon(
                     imageVector = Icons.Rounded.Security,

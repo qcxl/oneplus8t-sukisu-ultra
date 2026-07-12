@@ -163,13 +163,15 @@ suspend fun getFeaturePersistValue(feature: String): Long? = withContext(Dispatc
 fun install() {
     val start = SystemClock.elapsedRealtime()
     val libadbroot = File(ksuApp.applicationInfo.nativeLibraryDir, "libadbroot.so").absolutePath
-    val result = execKsud("install --libadbroot $libadbroot --data-path ${ksuApp.applicationInfo.deviceProtectedDataDir}", true)
+    val shell = getRootShell()
+    val result = ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} install --libadbroot $libadbroot --data-path ${ksuApp.applicationInfo.deviceProtectedDataDir}")
     Log.w(TAG, "install result: $result, cost: ${SystemClock.elapsedRealtime() - start}ms")
 }
 
 fun listModules(): String {
-    val (_, output) = ksudExec("module list", captureOutput = true)
-    return output.ifBlank { "[]" }
+    val shell = getRootShell()
+    return ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} module list")
+        .ifBlank { "[]" }
 }
 
 fun getModuleCount(): Int {
@@ -190,21 +192,24 @@ fun toggleModule(id: String, enable: Boolean): Boolean {
     } else {
         "module disable $id"
     }
-    val result = execKsud(cmd, true)
+    val shell = getRootShell()
+    val result = ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} $cmd")
     Log.i(TAG, "$cmd result: $result")
     return result
 }
 
 fun undoUninstallModule(id: String): Boolean {
     val cmd = "module undo-uninstall $id"
-    val result = execKsud(cmd, true)
+    val shell = getRootShell()
+    val result = ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} $cmd")
     Log.i(TAG, "undo uninstall module $id result: $result")
     return result
 }
 
 fun uninstallModule(id: String): Boolean {
     val cmd = "module uninstall $id"
-    val result = execKsud(cmd, true)
+    val shell = getRootShell()
+    val result = ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} $cmd")
     Log.i(TAG, "uninstall module $id result: $result")
     return result
 }
@@ -481,14 +486,16 @@ suspend fun getAvailablePartitions(): List<String> = withContext(Dispatchers.IO)
 }
 
 fun hasMagisk(): Boolean {
-    val result = execKsud("debug exec which magisk")
+    val shell = getRootShell()
+    val result = ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} debug exec which magisk")
     Log.i(TAG, "has magisk: $result")
     return result
 }
 
 fun isSepolicyValid(rules: String?): Boolean {
     if (rules == null) return true
-    return execKsud("sepolicy check '$rules'")
+    val shell = getRootShell()
+    return ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} sepolicy check '$rules'")
 }
 
 fun getSepolicy(pkg: String): String {
@@ -498,7 +505,8 @@ fun getSepolicy(pkg: String): String {
 }
 
 fun setSepolicy(pkg: String, rules: String): Boolean {
-    val result = execKsud("profile set-sepolicy $pkg '$rules'")
+    val shell = getRootShell()
+    val result = ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} profile set-sepolicy $pkg '$rules'")
     Log.i(TAG, "set sepolicy result: $result")
     return result
 }
@@ -515,16 +523,19 @@ fun getAppProfileTemplate(id: String): String {
 
 fun setAppProfileTemplate(id: String, template: String): Boolean {
     val escaped = template.replace("'", "'\\''")
-    return execKsud("profile set-template '$id' '$escaped'")
+    val shell = getRootShell()
+    return ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} profile set-template '$id' '$escaped'")
 }
 
 fun deleteAppProfileTemplate(id: String): Boolean {
-    return execKsud("profile delete-template '$id'")
+    val shell = getRootShell()
+    return ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} profile delete-template '$id'")
 }
 
 fun forceStopApp(packageName: String, userId: Int? = null) {
     val userArg = userId?.let { " --user $it" } ?: ""
-    execKsud("debug exec am force-stop$userArg $packageName")
+    val shell = getRootShell()
+    ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} debug exec am force-stop$userArg $packageName")
 }
 
 fun launchApp(packageName: String, userId: Int? = null) {

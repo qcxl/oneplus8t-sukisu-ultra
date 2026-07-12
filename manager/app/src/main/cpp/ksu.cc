@@ -16,6 +16,7 @@
 #include <climits>
 #include <sys/syscall.h>
 #include <cerrno>
+#include <fcntl.h>
 #include "ksu.h"
 
 static int fd = -1;
@@ -63,11 +64,22 @@ static inline int scan_driver_fd() {
     return found;
 }
 
+static inline int open_ksu_dev() {
+    int dev_fd = open("/dev/ksu", O_RDONLY | O_CLOEXEC);
+    if (dev_fd >= 0) {
+        return dev_fd;
+    }
+    return -1;
+}
+
 template<typename... Args>
 static int ksuctl(unsigned long op, Args &&... args) {
 
     if (fd < 0) {
         fd = scan_driver_fd();
+    }
+    if (fd < 0) {
+        fd = open_ksu_dev();
     }
 
     static_assert(sizeof...(Args) <= 1, "ioctl expects at most one extra argument");
@@ -247,6 +259,40 @@ bool is_selinux_enforce() {
     }
     if (!supported) {
         return true;
+    }
+    return value != 0;
+}
+
+// SU Log (KSU_FEATURE_SULOG = 2)
+bool set_sulog_enabled(bool enabled) {
+    return set_feature(KSU_FEATURE_SULOG, enabled ? 1 : 0);
+}
+
+bool is_sulog_enabled() {
+    uint64_t value = 0;
+    bool supported = false;
+    if (!get_feature(KSU_FEATURE_SULOG, &value, &supported)) {
+        return false;
+    }
+    if (!supported) {
+        return false;
+    }
+    return value != 0;
+}
+
+// ADB Root (KSU_FEATURE_ADB_ROOT = 3)
+bool set_adb_root_enabled(bool enabled) {
+    return set_feature(KSU_FEATURE_ADB_ROOT, enabled ? 1 : 0);
+}
+
+bool is_adb_root_enabled() {
+    uint64_t value = 0;
+    bool supported = false;
+    if (!get_feature(KSU_FEATURE_ADB_ROOT, &value, &supported)) {
+        return false;
+    }
+    if (!supported) {
+        return false;
     }
     return value != 0;
 }

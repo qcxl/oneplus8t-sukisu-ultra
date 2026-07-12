@@ -123,6 +123,18 @@ object Natives {
     external fun isSelinuxEnforce(): Boolean
 
     /**
+     * SU Log enable/disable via kernel ioctl (bypasses seccomp).
+     */
+    external fun setSulogEnabled(enabled: Boolean): Boolean
+    external fun isSulogEnabled(): Boolean
+
+    /**
+     * ADB Root enable/disable via kernel ioctl (bypasses seccomp).
+     */
+    external fun setAdbRootEnabled(enabled: Boolean): Boolean
+    external fun isAdbRootEnabled(): Boolean
+
+    /**
      * Get the user name for the uid.
      */
     external fun getUserName(uid: Int): String?

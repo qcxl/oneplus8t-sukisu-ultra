@@ -71,6 +71,7 @@ fun ToolsMaterial(
                     SelinuxToggleSectionMaterial(
                         selinuxEnforcing = state.selinuxEnforcing,
                         selinuxLoading = state.selinuxLoading,
+                        selinuxStatusDisplay = state.selinuxStatusDisplay,
                         onSelinuxToggle = actions.onSelinuxToggle
                     )
 
@@ -106,17 +107,15 @@ fun ToolsMaterial(
 private fun SelinuxToggleSectionMaterial(
     selinuxEnforcing: Boolean,
     selinuxLoading: Boolean,
+    selinuxStatusDisplay: String,
     onSelinuxToggle: (Boolean) -> Unit
 ) {
     SegmentedColumn(
         modifier = Modifier.padding(top = 12.dp),
         content = listOf({
-            val statusLabel by produceState(initialValue = "Unknown") {
-                value = withContext(Dispatchers.IO) { getSELinuxStatusRaw() }
-            }
             SegmentedListItem(
                 headlineContent = { Text(stringResource(R.string.tools_selinux_toggle)) },
-                supportingContent = { Text(stringResource(R.string.tools_selinux_summary, statusLabel)) },
+                supportingContent = { Text(stringResource(R.string.tools_selinux_summary, selinuxStatusDisplay)) },
                 leadingContent = {
                     Icon(
                         imageVector = Icons.Rounded.Security,
