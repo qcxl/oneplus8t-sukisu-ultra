@@ -1,8 +1,6 @@
 package com.sukisu.ultra.ui.util
 
 import android.os.SystemClock
-import com.topjohnwu.superuser.io.SuFile
-import com.topjohnwu.superuser.io.SuFileInputStream
 import java.io.InputStreamReader
 import java.time.Instant
 import java.time.LocalDate
@@ -95,29 +93,23 @@ internal fun resolveSulogFileCleanAction(
 }
 
 fun listSulogFiles(): List<SulogFile> {
-    val directory = SuFile(SULOG_DIR)
-    val fileNames = directory.list().orEmpty().toList()
+    val (exitCode, output) = ksudExecShell("ls $SULOG_DIR")
+    if (exitCode != 0 || output.isBlank()) return emptyList()
+    val fileNames = output.lines().filter { it.isNotBlank() }
     return parseSulogFileNames(fileNames).map { name ->
         SulogFile(name = name, path = "$SULOG_DIR/$name")
     }
 }
 
 fun readSulogFile(path: String): List<String> {
-    val suFile = SuFile(path)
-    if (!suFile.isFile) {
-        return emptyList()
-    }
-
+    val (exitCode, output) = ksudExecShell("cat \"$path\"")
+    if (exitCode != 0 || output.isBlank()) return emptyList()
     val lines = ArrayDeque<String>(SULOG_LINE_LIMIT)
-    SuFileInputStream.open(suFile).use { input ->
-        InputStreamReader(input).buffered().useLines { sequence ->
-            sequence.forEach { line ->
-                if (lines.size == SULOG_LINE_LIMIT) {
-                    lines.removeFirst()
-                }
-                lines.addLast(line)
-            }
+    output.lines().forEach { line ->
+        if (lines.size == SULOG_LINE_LIMIT) {
+            lines.removeFirst()
         }
+        lines.addLast(line)
     }
     return lines.toList()
 }
@@ -326,11 +318,11 @@ internal fun String.toSulogDisplayName(): String {
 }
 
 fun cleanSulogFile(path: String): Boolean {
-    val suFile = SuFile(path)
-    return suFile.clear()
+    val (exitCode, _) = ksudExecShell(": > \"$path\"")
+    return exitCode == 0
 }
 
 fun deleteSulogFile(path: String): Boolean {
-    val suFile = SuFile(path)
-    return suFile.delete()
+    val (exitCode, _) = ksudExecShell("rm \"$path\"")
+    return exitCode == 0
 }

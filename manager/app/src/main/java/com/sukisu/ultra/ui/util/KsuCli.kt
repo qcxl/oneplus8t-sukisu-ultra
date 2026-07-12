@@ -130,6 +130,26 @@ fun ksudExec(args: String, captureOutput: Boolean = false): Pair<Int, String> {
     }
 }
 
+/**
+ * Execute a shell command via ksud's interactive root shell (stdin pipe).
+ * Unlike ksudExec(), this works for arbitrary shell commands (setenforce, ls, etc.)
+ * since it pipes the command to `ksud debug su` instead of expecting a ksud subcommand.
+ */
+fun ksudExecShell(command: String): Pair<Int, String> {
+    return try {
+        val proc = Runtime.getRuntime().exec("${getKsuDaemonPath()} debug su")
+        proc.outputStream.write("$command\nexit\n".toByteArray())
+        proc.outputStream.flush()
+        proc.outputStream.close()
+        val output = BufferedReader(InputStreamReader(proc.inputStream)).readText().trim()
+        val exitCode = proc.waitFor()
+        exitCode to output
+    } catch (e: Exception) {
+        Log.e(TAG, "ksudExecShell failed: $command", e)
+        -1 to ""
+    }
+}
+
 fun execKsud(args: String, newShell: Boolean = false): Boolean {
     val (exitCode, _) = ksudExec(args)
     return exitCode == 0

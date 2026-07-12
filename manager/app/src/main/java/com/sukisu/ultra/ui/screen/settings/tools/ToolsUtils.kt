@@ -11,17 +11,27 @@ import java.io.File
 import java.io.InputStreamReader
 
 fun isSelinuxPermissive(): Boolean {
-    val (exitCode, output) = ksudExec("shell -c getenforce", captureOutput = true)
-    return when {
-        exitCode == 0 && output.lowercase() == "permissive" -> true
-        else -> false
+    return try {
+        val proc = Runtime.getRuntime().exec("getenforce")
+        val output = proc.inputStream.bufferedReader().readText().trim().lowercase()
+        proc.waitFor()
+        output == "permissive"
+    } catch (_: Exception) {
+        false
     }
 }
 
 fun setSelinuxPermissive(permissive: Boolean): Boolean {
-    val target = if (permissive) "0" else "1"
-    val (exitCode, _) = ksudExec("shell -c 'setenforce $target'")
-    return exitCode == 0
+    return try {
+        val target = if (permissive) "0" else "1"
+        val proc = Runtime.getRuntime().exec("/data/adb/ksu/ksud debug su")
+        proc.outputStream.write("setenforce $target\n".toByteArray())
+        proc.outputStream.flush()
+        proc.outputStream.close()
+        proc.waitFor() == 0
+    } catch (_: Exception) {
+        false
+    }
 }
 
 suspend fun backupAllowlistToUri(context: Context, targetUri: Uri): Boolean = withContext(Dispatchers.IO) {
