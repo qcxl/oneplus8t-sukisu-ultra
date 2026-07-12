@@ -170,8 +170,9 @@ fun install() {
 
 fun listModules(): String {
     val shell = getRootShell()
-    val output = ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} module list").trim()
-    return output.ifBlank { "[]" }
+    val out = shell.newJob().add("${getKsuDaemonPath()} module list")
+        .to(ArrayList<String>(), null).exec().out
+    return out.joinToString("\n").trim().ifBlank { "[]" }
 }
 
 fun getModuleCount(): Int {
@@ -513,13 +514,16 @@ fun setSepolicy(pkg: String, rules: String): Boolean {
 
 fun listAppProfileTemplates(): List<String> {
     val shell = getRootShell()
-    val output = ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} profile list-templates").trim()
-    return output.lines().filter { it.isNotBlank() }
+    val out = shell.newJob().add("${getKsuDaemonPath()} profile list-templates")
+        .to(ArrayList<String>(), null).exec().out
+    return out.filter { it.isNotBlank() }
 }
 
 fun getAppProfileTemplate(id: String): String {
     val shell = getRootShell()
-    return ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} profile get-template '$id'").trim()
+    val out = shell.newJob().add("${getKsuDaemonPath()} profile get-template '$id'")
+        .to(ArrayList<String>(), null).exec().out
+    return out.joinToString("\n").trim()
 }
 
 fun setAppProfileTemplate(id: String, template: String): Boolean {
