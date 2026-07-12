@@ -169,7 +169,8 @@ fun install() {
 }
 
 fun listModules(): String {
-    val (_, output) = ksudExec("module list", captureOutput = true)
+    val shell = getRootShell()
+    val output = ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} module list").trim()
     return output.ifBlank { "[]" }
 }
 
@@ -511,13 +512,14 @@ fun setSepolicy(pkg: String, rules: String): Boolean {
 }
 
 fun listAppProfileTemplates(): List<String> {
-    val (_, output) = ksudExec("profile list-templates", captureOutput = true)
+    val shell = getRootShell()
+    val output = ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} profile list-templates").trim()
     return output.lines().filter { it.isNotBlank() }
 }
 
 fun getAppProfileTemplate(id: String): String {
-    val (_, output) = ksudExec("profile get-template '$id'", captureOutput = true)
-    return output
+    val shell = getRootShell()
+    return ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} profile get-template '$id'").trim()
 }
 
 fun setAppProfileTemplate(id: String, template: String): Boolean {
