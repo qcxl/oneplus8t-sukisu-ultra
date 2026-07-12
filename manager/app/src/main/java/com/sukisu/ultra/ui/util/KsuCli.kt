@@ -170,8 +170,8 @@ fun install() {
 
 fun listModules(): String {
     val shell = getRootShell()
-    return ShellUtils.fastCmd(shell, "${getKsuDaemonPath()} module list")
-        .ifBlank { "[]" }
+    val result = shell.newJob().add("${getKsuDaemonPath()} module list").exec()
+    return result.out.joinToString("\n").ifBlank { "[]" }
 }
 
 fun getModuleCount(): Int {
