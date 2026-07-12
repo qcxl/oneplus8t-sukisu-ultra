@@ -6,8 +6,6 @@ import androidx.compose.runtime.Immutable
 import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
 import com.sukisu.ultra.Natives.Profile.RootProfileFlag
-import java.io.BufferedReader
-import java.io.InputStreamReader
 
 /**
  * @author weishu
@@ -58,10 +56,11 @@ object Natives {
     // Request KSU fd via root shell (runs ksu_fd_helper to bypass seccomp).
     private fun requestKsuFd(): Int {
         return try {
-            val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", "/data/local/tmp/ksu_fd_helper"))
-            val line = BufferedReader(InputStreamReader(proc.inputStream)).readLine()
-            proc.waitFor()
-            line?.trim()?.toIntOrNull() ?: -1
+            val out = com.sukisu.ultra.ui.util.KsuCli.SHELL.newJob()
+                .add("/data/local/tmp/ksu_fd_helper")
+                .to(ArrayList<String>(), null)
+                .exec().out
+            out.firstOrNull()?.trim()?.toIntOrNull() ?: -1
         } catch (_: Exception) { -1 }
     }
 
