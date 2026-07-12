@@ -1,32 +1,22 @@
 package com.sukisu.ultra.ui.util
 
-import com.topjohnwu.superuser.Shell
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 /**
  * Returns the raw SELinux status string ("Enforcing", "Permissive", "Disabled", or "Unknown").
  * Safe to call from any thread (IO recommended).
  */
 fun getSELinuxStatusRaw(): String {
-    val shell = Shell.Builder.create().build("sh")
-
-    val stdoutList = ArrayList<String>()
-    val stderrList = ArrayList<String>()
-    val result = shell.use {
-        it.newJob().add("getenforce").to(stdoutList, stderrList).exec()
-    }
-    val stdout = stdoutList.joinToString("\n").trim()
-    val stderr = stderrList.joinToString("\n").trim()
-
-    if (result.isSuccess) {
-        return when (stdout) {
+    return try {
+        val proc = Runtime.getRuntime().exec("getenforce")
+        val stdout = BufferedReader(InputStreamReader(proc.inputStream)).readText().trim()
+        proc.waitFor()
+        when (stdout) {
             "Enforcing", "Permissive", "Disabled" -> stdout
             else -> "Unknown"
         }
-    }
-
-    return if (stderr.endsWith("Permission denied")) {
-        "Enforcing"
-    } else {
+    } catch (e: Exception) {
         "Unknown"
     }
 }

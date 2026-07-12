@@ -3,6 +3,7 @@ package com.sukisu.ultra.ui.screen.settings.tools
 import android.content.Context
 import android.net.Uri
 import com.topjohnwu.superuser.Shell
+import com.sukisu.ultra.ui.util.ksudExec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -10,25 +11,17 @@ import java.io.File
 import java.io.InputStreamReader
 
 fun isSelinuxPermissive(): Boolean {
-    return try {
-        val proc = Runtime.getRuntime().exec("getenforce")
-        val output = BufferedReader(InputStreamReader(proc.inputStream)).readText().trim().lowercase()
-        proc.waitFor()
-        output == "permissive"
-    } catch (e: Exception) {
-        false
+    val (exitCode, output) = ksudExec("shell -c getenforce", captureOutput = true)
+    return when {
+        exitCode == 0 && output.lowercase() == "permissive" -> true
+        else -> false
     }
 }
 
 fun setSelinuxPermissive(permissive: Boolean): Boolean {
     val target = if (permissive) "0" else "1"
-    return try {
-        val proc = Runtime.getRuntime().exec("setenforce $target")
-        val exit = proc.waitFor()
-        exit == 0
-    } catch (e: Exception) {
-        false
-    }
+    val (exitCode, _) = ksudExec("shell -c 'setenforce $target'")
+    return exitCode == 0
 }
 
 suspend fun backupAllowlistToUri(context: Context, targetUri: Uri): Boolean = withContext(Dispatchers.IO) {
