@@ -101,7 +101,7 @@ class ModuleViewModel(
                 sortActionFirst = settingsRepo.moduleSortActionFirst,
             )
         }
-        updateModuleList()
+        viewModelScope.launch { updateModuleList() }
     }
 
     fun toggleSortActionFirst() {
