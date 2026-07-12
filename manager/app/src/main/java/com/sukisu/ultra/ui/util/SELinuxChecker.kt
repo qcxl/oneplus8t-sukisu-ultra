@@ -1,22 +1,22 @@
 package com.sukisu.ultra.ui.util
 
-import java.io.BufferedReader
-import java.io.InputStreamReader
-
 /**
  * Returns the raw SELinux status string ("Enforcing", "Permissive", "Disabled", or "Unknown").
- * Safe to call from any thread (IO recommended).
+ * Falls back to reading /sys/fs/selinux/enforce via ksud root shell if direct getenforce fails.
  */
 fun getSELinuxStatusRaw(): String {
-    return try {
+    // Method 1: direct getenforce
+    try {
         val proc = Runtime.getRuntime().exec("getenforce")
-        val stdout = BufferedReader(InputStreamReader(proc.inputStream)).readText().trim()
+        val stdout = proc.inputStream.bufferedReader().readText().trim()
         proc.waitFor()
-        when (stdout) {
-            "Enforcing", "Permissive", "Disabled" -> stdout
-            else -> "Unknown"
-        }
-    } catch (e: Exception) {
-        "Unknown"
+        if (stdout in listOf("Enforcing", "Permissive", "Disabled")) return stdout
+    } catch (_: Exception) {}
+    // Method 2: read enforce file via ksud root shell (works even when enforcing blocks exec)
+    val (_, out) = ksudExecShell("cat /sys/fs/selinux/enforce")
+    return when (out.trim()) {
+        "0" -> "Permissive"
+        "1" -> "Enforcing"
+        else -> "Unknown"
     }
 }

@@ -67,7 +67,7 @@ fun AppProfileTemplateScreen() {
         }
     }
 
-    val uiState = screenState.copy(offline = !isNetworkAvailable(context))
+    val uiState = screenState.copy(offline = screenState.offline || !isNetworkAvailable(context))
     val actions = TemplateActions(
         onBack = dropUnlessResumed { navigator.pop() },
         onRefresh = { forceSync ->
