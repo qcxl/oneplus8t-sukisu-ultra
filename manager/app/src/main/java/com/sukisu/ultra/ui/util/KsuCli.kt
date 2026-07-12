@@ -512,13 +512,15 @@ fun setSepolicy(pkg: String, rules: String): Boolean {
 }
 
 fun listAppProfileTemplates(): List<String> {
-    val (_, output) = ksudExec("profile list-templates", captureOutput = true)
-    return output.lines().filter { it.isNotBlank() }
+    val shell = getRootShell()
+    val result = shell.newJob().add("${getKsuDaemonPath()} profile list-templates").exec()
+    return result.out.filter { it.isNotBlank() }
 }
 
 fun getAppProfileTemplate(id: String): String {
-    val (_, output) = ksudExec("profile get-template '$id'", captureOutput = true)
-    return output
+    val shell = getRootShell()
+    val result = shell.newJob().add("${getKsuDaemonPath()} profile get-template '$id'").exec()
+    return result.out.joinToString("\n")
 }
 
 fun setAppProfileTemplate(id: String, template: String): Boolean {
