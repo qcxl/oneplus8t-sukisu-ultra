@@ -136,7 +136,7 @@ class SuperUserRepositoryImpl : SuperUserRepository {
         crossinline onDisconnect: () -> Unit = {}
     ): Pair<IBinder, ServiceConnection> = withContext(Dispatchers.Main) {
         val firstAttempt = runCatching {
-            withTimeout(15000L) { connectOnce(onDisconnect) }
+            withTimeout(15000L) { connectOnce { onDisconnect() } }
         }
         if (firstAttempt.isSuccess) {
             return@withContext firstAttempt.getOrThrow()
@@ -148,6 +148,6 @@ class SuperUserRepositoryImpl : SuperUserRepository {
             mainJar.delete()
             Log.i(TAG, "deleted stale main.jar, retrying connectKsuService")
         }
-        withTimeout(15000L) { connectOnce(onDisconnect) }
+        withTimeout(15000L) { connectOnce { onDisconnect() } }
     }
 }
