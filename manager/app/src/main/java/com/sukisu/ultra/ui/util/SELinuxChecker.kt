@@ -1,7 +1,6 @@
 package com.sukisu.ultra.ui.util
 
 import java.io.File
-import java.io.IOException
 
 fun getSELinuxStatusRaw(): String {
     if (!File("/sys/fs/selinux").exists()) return "Disabled"
@@ -15,16 +14,12 @@ fun getSELinuxStatusRaw(): String {
         val stdout = proc.inputStream.bufferedReader().readText().trim()
         proc.waitFor()
         if (stdout in listOf("Enforcing", "Permissive", "Disabled")) return stdout
-    } catch (e: IOException) {
-        if (e.message?.contains("error=13", ignoreCase = true) == true ||
-            e.message?.contains("Permission denied", ignoreCase = true) == true) {
-            return "Enforcing"
-        }
+        if (stdout.isEmpty()) return "Enforcing"
     } catch (_: Exception) {}
     val (_, out) = ksudExecShell("cat /sys/fs/selinux/enforce")
     return when (out.trim()) {
         "0" -> "Permissive"
         "1" -> "Enforcing"
-        else -> "Unknown"
+        else -> "Enforcing"
     }
 }
