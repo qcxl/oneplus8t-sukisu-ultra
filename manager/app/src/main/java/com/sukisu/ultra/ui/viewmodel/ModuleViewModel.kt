@@ -108,14 +108,14 @@ class ModuleViewModel(
         val newValue = !_uiState.value.sortActionFirst
         settingsRepo.moduleSortActionFirst = newValue
         _uiState.update { it.copy(sortActionFirst = newValue) }
-        updateModuleList()
+        viewModelScope.launch { updateModuleList() }
     }
 
     fun toggleSortEnabledFirst() {
         val newValue = !_uiState.value.sortEnabledFirst
         settingsRepo.moduleSortEnabledFirst = newValue
         _uiState.update { it.copy(sortEnabledFirst = newValue) }
-        updateModuleList()
+        viewModelScope.launch { updateModuleList() }
     }
 
     fun refreshEnvironmentState() {
@@ -183,8 +183,8 @@ class ModuleViewModel(
         }
     }
 
-    private fun updateModuleList(resort: Boolean = true) {
-        viewModelScope.launch(Dispatchers.IO) {
+    private suspend fun updateModuleList(resort: Boolean = true) {
+        withContext(Dispatchers.IO) {
             val state = _uiState.value
             val searchText = state.searchStatus.searchText
             val shorted = if (resort || state.moduleList.isEmpty()) {
