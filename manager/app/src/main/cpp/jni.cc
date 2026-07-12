@@ -13,6 +13,12 @@
 #include "logging.h"
 
 extern "C"
+JNIEXPORT void JNICALL
+Java_com_sukisu_ultra_Natives_setKsuFd(JNIEnv *env, jclass, jint ksu_fd) {
+    set_ksu_fd(ksu_fd);
+}
+
+extern "C"
 JNIEXPORT jint JNICALL
 Java_com_sukisu_ultra_Natives_getVersion(JNIEnv *env, jobject) {
     uint32_t version = get_version();

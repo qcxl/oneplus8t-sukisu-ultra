@@ -22,8 +22,7 @@ static int fd = -1;
 
 static int preset_fd = -1;
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_sukisu_ultra_Natives_setKsuFd(JNIEnv *env, jclass, jint ksu_fd) {
+void set_ksu_fd(int ksu_fd) {
     preset_fd = ksu_fd;
     if (ksu_fd >= 0) {
         fd = ksu_fd;

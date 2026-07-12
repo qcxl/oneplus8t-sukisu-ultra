@@ -12,6 +12,8 @@
 
 #include "uapi/ksu.h"
 
+void set_ksu_fd(int ksu_fd);
+
 uint32_t get_kernel_uapi_version();
 
 uint32_t get_manager_uapi_version();
