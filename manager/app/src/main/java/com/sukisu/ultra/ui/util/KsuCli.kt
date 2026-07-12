@@ -169,9 +169,8 @@ fun install() {
 }
 
 fun listModules(): String {
-    val shell = getRootShell()
-    val result = shell.newJob().add("${getKsuDaemonPath()} module list").exec()
-    return result.out.joinToString("\n").ifBlank { "[]" }
+    val (_, output) = ksudExec("module list", captureOutput = true)
+    return output.ifBlank { "[]" }
 }
 
 fun getModuleCount(): Int {
@@ -512,15 +511,13 @@ fun setSepolicy(pkg: String, rules: String): Boolean {
 }
 
 fun listAppProfileTemplates(): List<String> {
-    val shell = getRootShell()
-    val result = shell.newJob().add("${getKsuDaemonPath()} profile list-templates").exec()
-    return result.out.filter { it.isNotBlank() }
+    val (_, output) = ksudExec("profile list-templates", captureOutput = true)
+    return output.lines().filter { it.isNotBlank() }
 }
 
 fun getAppProfileTemplate(id: String): String {
-    val shell = getRootShell()
-    val result = shell.newJob().add("${getKsuDaemonPath()} profile get-template '$id'").exec()
-    return result.out.joinToString("\n")
+    val (_, output) = ksudExec("profile get-template '$id'", captureOutput = true)
+    return output
 }
 
 fun setAppProfileTemplate(id: String, template: String): Boolean {
