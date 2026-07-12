@@ -172,23 +172,54 @@ class SettingsRepositoryImpl : SettingsRepository {
 
     override fun setSelinuxHideEnabled(enabled: Boolean): Int = Natives.setSelinuxHideEnabled(enabled)
 
-    override suspend fun getSulogStatus(): String = getFeatureStatus("sulog")
-
-    override suspend fun getSulogPersistValue(): Long? = getFeaturePersistValue("sulog")
-
-    override fun setSulogEnabled(enabled: Boolean): Boolean = execKsud("feature set sulog ${if (enabled) 1 else 0}", true)
-
-    override suspend fun getAdbRootStatus(): String = getFeatureStatus("adb_root")
-
-    override suspend fun getAdbRootPersistValue(): Long? = getFeaturePersistValue("adb_root")
-
-    override fun setAdbRootEnabled(enabled: Boolean): Boolean =
-        if (execKsud("feature set adb_root ${if (enabled) 1 else 0}", true)) {
-            ShellUtils.fastCmd("setprop ctl.restart adbd")
-            true
-        } else {
-            false
+    override suspend fun getSulogStatus(): String {
+        return try {
+            // JNI ioctl works → feature is supported
+            if (Natives.kernelUAPIVersion > 0 || Natives.version > 0) "supported" else "unsupported"
+        } catch (_: Exception) {
+            getFeatureStatus("sulog")
         }
+    }
+
+    override suspend fun getSulogPersistValue(): Long? {
+        return try {
+            // Use JNI ioctl to read runtime state (avoids seccomp crash from ksudExec)
+            if (Natives.isSulogEnabled()) 1L else 0L
+        } catch (_: Exception) {
+            getFeaturePersistValue("sulog")
+        }
+    }
+
+    override fun setSulogEnabled(enabled: Boolean): Boolean {
+        val ok = Natives.setSulogEnabled(enabled)
+        if (ok) execKsudFeatureSave()
+        return ok
+    }
+
+    override suspend fun getAdbRootStatus(): String {
+        return try {
+            if (Natives.kernelUAPIVersion > 0 || Natives.version > 0) "supported" else "unsupported"
+        } catch (_: Exception) {
+            getFeatureStatus("adb_root")
+        }
+    }
+
+    override suspend fun getAdbRootPersistValue(): Long? {
+        return try {
+            if (Natives.isAdbRootEnabled()) 1L else 0L
+        } catch (_: Exception) {
+            getFeaturePersistValue("adb_root")
+        }
+    }
+
+    override fun setAdbRootEnabled(enabled: Boolean): Boolean {
+        val ok = Natives.setAdbRootEnabled(enabled)
+        if (ok) {
+            execKsudFeatureSave()
+            ShellUtils.fastCmd("setprop ctl.restart adbd")
+        }
+        return ok
+    }
 
     override fun isDefaultUmountModules(): Boolean = Natives.isDefaultUmountModules()
 
