@@ -136,8 +136,12 @@ fun execKsud(args: String, newShell: Boolean = false): Boolean {
 }
 
 suspend fun getFeatureStatus(feature: String): String = withContext(Dispatchers.IO) {
-    val (_, output) = ksudExec("feature check $feature", captureOutput = true)
-    output.lines().firstOrNull()?.trim().orEmpty()
+    val (exitCode, output) = ksudExec("feature check $feature", captureOutput = true)
+    val status = output.lines().firstOrNull()?.trim().orEmpty()
+    // When SELinux Enforcing, Runtime.exec() to /data/adb/ksu/ksud is blocked,
+    // so ksudExec returns -1/"". The kernel has all features compiled in, so
+    // assume "supported" on exec failure rather than showing all switches disabled.
+    if (status.isEmpty() && exitCode != 0) "supported" else status
 }
 
 suspend fun getFeaturePersistValue(feature: String): Long? = withContext(Dispatchers.IO) {
