@@ -29,7 +29,7 @@ class ModuleRepoRepositoryImpl : ModuleRepoRepository {
                     throw Exception("Fetch failed: ${response.code}")
                 }
 
-                val body = response.body.string()
+                val body = response.body?.string() ?: throw Exception("Empty response body")
                 val json = JSONArray(body)
                 (0 until json.length()).mapNotNull { idx ->
                     val item = json.optJSONObject(idx) ?: return@mapNotNull null

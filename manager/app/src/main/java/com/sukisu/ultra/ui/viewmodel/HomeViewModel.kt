@@ -33,7 +33,7 @@ class HomeViewModel(
     private val settingsRepo: SettingsRepository = SettingsRepositoryImpl()
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(buildState())
+    private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     fun refresh() {

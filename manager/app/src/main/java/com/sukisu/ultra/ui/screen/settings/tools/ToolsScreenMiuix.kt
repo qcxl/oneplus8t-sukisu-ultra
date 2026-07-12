@@ -16,6 +16,8 @@ import androidx.compose.material.icons.rounded.FolderDelete
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -27,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import com.sukisu.ultra.R
 import com.sukisu.ultra.ui.component.KsuIsValid
 import com.sukisu.ultra.ui.theme.LocalEnableBlur
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.sukisu.ultra.ui.util.BlurredBar
 import com.sukisu.ultra.ui.util.getSELinuxStatusRaw
 import com.sukisu.ultra.ui.util.rememberBlurBackdrop
@@ -139,7 +143,9 @@ private fun SelinuxToggleSectionMiuix(
             .padding(top = 12.dp)
             .fillMaxWidth(),
     ) {
-        val statusLabel = getSELinuxStatusRaw()
+        val statusLabel by produceState(initialValue = "Unknown") {
+            value = withContext(Dispatchers.IO) { getSELinuxStatusRaw() }
+        }
         SwitchPreference(
             title = stringResource(R.string.tools_selinux_toggle),
             summary = stringResource(R.string.tools_selinux_summary, statusLabel),

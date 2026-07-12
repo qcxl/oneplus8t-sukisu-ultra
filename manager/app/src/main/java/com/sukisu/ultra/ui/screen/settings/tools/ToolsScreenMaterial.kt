@@ -22,6 +22,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
@@ -34,6 +36,8 @@ import com.sukisu.ultra.ui.component.material.SegmentedListItem
 import com.sukisu.ultra.ui.component.material.TopBarBackButton
 import com.sukisu.ultra.ui.component.material.expressiveTopAppBarColors
 import com.sukisu.ultra.ui.util.getSELinuxStatusRaw
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ToolsMaterial(
@@ -107,7 +111,9 @@ private fun SelinuxToggleSectionMaterial(
     SegmentedColumn(
         modifier = Modifier.padding(top = 12.dp),
         content = listOf({
-            val statusLabel = getSELinuxStatusRaw()
+            val statusLabel by produceState(initialValue = "Unknown") {
+                value = withContext(Dispatchers.IO) { getSELinuxStatusRaw() }
+            }
             SegmentedListItem(
                 headlineContent = { Text(stringResource(R.string.tools_selinux_toggle)) },
                 supportingContent = { Text(stringResource(R.string.tools_selinux_summary, statusLabel)) },

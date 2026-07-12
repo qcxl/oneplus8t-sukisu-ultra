@@ -48,8 +48,8 @@ data class FlashResult(val code: Int, val err: String, val showReboot: Boolean) 
 }
 
 object KsuCli {
-    val SHELL: Shell = createRootShell()
-    val GLOBAL_MNT_SHELL: Shell = createRootShell(true)
+    val SHELL: Shell by lazy { createRootShell() }
+    val GLOBAL_MNT_SHELL: Shell by lazy { createRootShell(true) }
 }
 
 fun getRootShell(globalMnt: Boolean = false): Shell {
@@ -158,11 +158,8 @@ fun install() {
 }
 
 fun listModules(): String {
-    val shell = getRootShell()
-
-    val out = shell.newJob()
-        .add("${getKsuDaemonPath()} module list").to(ArrayList(), null).exec().out
-    return out.joinToString("\n").ifBlank { "[]" }
+    val (_, output) = ksudExec("module list", captureOutput = true)
+    return output.ifBlank { "[]" }
 }
 
 fun getModuleCount(): Int {
@@ -231,10 +228,12 @@ fun flashModule(
     onStderr: (String) -> Unit
 ): FlashResult {
     val resolver = ksuApp.contentResolver
-    with(resolver.openInputStream(uri)) {
+    val inputStream = resolver.openInputStream(uri)
+        ?: throw IllegalArgumentException("Cannot open input stream for $uri")
+    inputStream.use { stream ->
         val file = File(ksuApp.cacheDir, "module.zip")
         file.outputStream().use { output ->
-            this?.copyTo(output)
+            stream.copyTo(output)
         }
         val cmd = "module install ${file.absolutePath}"
         val result = flashWithIO("${getKsuDaemonPath()} $cmd", onStdout, onStderr)
@@ -313,10 +312,12 @@ fun installBoot(
     val resolver = ksuApp.contentResolver
 
     val bootFile = bootUri?.let { uri ->
-        with(resolver.openInputStream(uri)) {
+        val inputStream = resolver.openInputStream(uri)
+            ?: throw IllegalArgumentException("Cannot open input stream for $uri")
+        inputStream.use { stream ->
             val bootFile = File(ksuApp.cacheDir, "boot.img")
             bootFile.outputStream().use { output ->
-                this?.copyTo(output)
+                stream.copyTo(output)
             }
 
             bootFile
@@ -359,14 +360,15 @@ fun installBoot(
     var lkmFile: File? = null
     when (lkm) {
         is LkmSelection.LkmUri -> {
-            lkmFile = with(resolver.openInputStream(lkm.uri)) {
-                val file = File(ksuApp.cacheDir, "kernelsu-tmp-lkm.ko")
-                file.outputStream().use { output ->
-                    this?.copyTo(output)
+            lkmFile = resolver.openInputStream(lkm.uri)?.let { lkmStream ->
+                lkmStream.use { stream ->
+                    val file = File(ksuApp.cacheDir, "kernelsu-tmp-lkm.ko")
+                    file.outputStream().use { output ->
+                        stream.copyTo(output)
+                    }
+                    file
                 }
-
-                file
-            }
+            } ?: throw IllegalArgumentException("Cannot open input stream for ${lkm.uri}")
             cmd += " -m ${lkmFile.absolutePath}"
         }
 
@@ -433,10 +435,8 @@ suspend fun getCurrentKmi(): String = withContext(Dispatchers.IO) {
 }
 
 suspend fun getSupportedKmis(): List<String> = withContext(Dispatchers.IO) {
-    val shell = getRootShell()
-    val cmd = "boot-info supported-kmis"
-    val out = shell.newJob().add("${getKsuDaemonPath()} $cmd").to(ArrayList(), null).exec().out
-    out.filter { it.isNotBlank() }.map { it.trim() }
+    val (_, output) = ksudExec("boot-info supported-kmis", captureOutput = true)
+    output.lines().filter { it.isNotBlank() }.map { it.trim() }
 }
 
 suspend fun isAbDevice(): Boolean = withContext(Dispatchers.IO) {
@@ -466,45 +466,31 @@ suspend fun getSlotSuffix(ota: Boolean): String = withContext(Dispatchers.IO) {
 }
 
 suspend fun getAvailablePartitions(): List<String> = withContext(Dispatchers.IO) {
-    val shell = getRootShell()
-    val cmd = "boot-info available-partitions"
-    val out = shell.newJob().add("${getKsuDaemonPath()} $cmd").to(ArrayList(), null).exec().out
-    out.filter { it.isNotBlank() }.map { it.trim() }
+    val (_, output) = ksudExec("boot-info available-partitions", captureOutput = true)
+    output.lines().filter { it.isNotBlank() }.map { it.trim() }
 }
 
 fun hasMagisk(): Boolean {
-    val shell = getRootShell(true)
-    val result = shell.newJob().add("which magisk").exec()
-    Log.i(TAG, "has magisk: ${result.isSuccess}")
-    return result.isSuccess
+    val result = execKsud("debug exec which magisk")
+    Log.i(TAG, "has magisk: $result")
+    return result
 }
 
 fun isSepolicyValid(rules: String?): Boolean {
-    if (rules == null) {
-        return true
-    }
-    val shell = getRootShell()
-    val result =
-        shell.newJob().add("${getKsuDaemonPath()} sepolicy check '$rules'").to(ArrayList(), null)
-            .exec()
-    return result.isSuccess
+    if (rules == null) return true
+    return execKsud("sepolicy check '$rules'")
 }
 
 fun getSepolicy(pkg: String): String {
-    val shell = getRootShell()
-    val result =
-        shell.newJob().add("${getKsuDaemonPath()} profile get-sepolicy $pkg").to(ArrayList(), null)
-            .exec()
-    Log.i(TAG, "code: ${result.code}, out: ${result.out}, err: ${result.err}")
-    return result.out.joinToString("\n")
+    val (exitCode, output) = ksudExec("profile get-sepolicy $pkg", captureOutput = true)
+    Log.i(TAG, "code: $exitCode, out: $output")
+    return output
 }
 
 fun setSepolicy(pkg: String, rules: String): Boolean {
-    val shell = getRootShell()
-    val result = shell.newJob().add("${getKsuDaemonPath()} profile set-sepolicy $pkg '$rules'")
-        .to(ArrayList(), null).exec()
-    Log.i(TAG, "set sepolicy result: ${result.code}")
-    return result.isSuccess
+    val result = execKsud("profile set-sepolicy $pkg '$rules'")
+    Log.i(TAG, "set sepolicy result: $result")
+    return result
 }
 
 fun listAppProfileTemplates(): List<String> {
@@ -567,11 +553,9 @@ fun getKpmModuleCount(): Int {
 }
 
 fun runCmd(shell: Shell, cmd: String): String {
-    return shell.newJob()
-        .add(cmd)
-        .to(mutableListOf<String>(), null)
-        .exec().out
-        .joinToString("\n")
+    val ksudArgs = cmd.removePrefix("${getKsuDaemonPath()} ")
+    val (_, output) = ksudExec(ksudArgs, captureOutput = true)
+    return output
 }
 
 suspend fun streamFile(path: String): List<String> = withContext(Dispatchers.IO) {
@@ -731,9 +715,8 @@ data class BootConfig(
 
 // 读取镜像中的 ksu_config 参数
 suspend fun getBootConfig(): BootConfig = withContext(Dispatchers.IO) {
-    val shell = getRootShell()
-    val cmd = "${getKsuDaemonPath()} boot-info read-config"
-    val out = shell.newJob().add(cmd).to(ArrayList(), null).exec().out
+    val (_, output) = ksudExec("boot-info read-config", captureOutput = true)
+    val out = output.lines()
 
     var allowShell = false
     var spoofRelease = ""

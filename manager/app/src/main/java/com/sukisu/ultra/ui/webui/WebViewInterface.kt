@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
+import android.util.Log
 import android.view.Window
 import android.webkit.JavascriptInterface
 import android.widget.Toast
@@ -27,8 +28,21 @@ class WebViewInterface(private val state: WebUIState) {
     private val webView get() = state.webView
     private val modDir get() = state.modDir
 
+    companion object {
+        private const val TAG = "WebViewInterface"
+    }
+
+    private fun isTrustedOrigin(): Boolean {
+        val url = webView?.url ?: return false
+        return url.startsWith("file://") || url.startsWith("app://")
+    }
+
     @JavascriptInterface
     fun exec(cmd: String): String {
+        if (!isTrustedOrigin()) {
+            Log.w(TAG, "exec denied from untrusted origin: ${webView?.url}")
+            return ""
+        }
         return withNewRootShell(true) { ShellUtils.fastCmd(this, cmd) }
     }
 
@@ -60,6 +74,10 @@ class WebViewInterface(private val state: WebUIState) {
         options: String?,
         callbackFunc: String
     ) {
+        if (!isTrustedOrigin()) {
+            Log.w(TAG, "exec denied from untrusted origin: ${webView?.url}")
+            return
+        }
         val finalCommand = StringBuilder()
         processOptions(finalCommand, options)
         finalCommand.append(cmd)
@@ -83,6 +101,10 @@ class WebViewInterface(private val state: WebUIState) {
 
     @JavascriptInterface
     fun spawn(command: String, args: String, options: String?, callbackFunc: String) {
+        if (!isTrustedOrigin()) {
+            Log.w(TAG, "spawn denied from untrusted origin: ${webView?.url}")
+            return
+        }
         val finalCommand = StringBuilder()
 
         processOptions(finalCommand, options)

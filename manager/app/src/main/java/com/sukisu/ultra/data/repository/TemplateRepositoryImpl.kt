@@ -83,7 +83,8 @@ class TemplateRepositoryImpl : TemplateRepository {
                 if (!response.isSuccessful) {
                     return
                 }
-                val remoteTemplateIds = JSONArray(response.body.string())
+                val body = response.body?.string() ?: return
+                val remoteTemplateIds = JSONArray(body)
                 Log.i(TAG, "fetchRemoteTemplates: $remoteTemplateIds")
                 (0 until remoteTemplateIds.length()).forEach { i ->
                     val id = remoteTemplateIds.getString(i)
@@ -95,7 +96,7 @@ class TemplateRepositoryImpl : TemplateRepository {
                             if (!response.isSuccessful) {
                                 return@forEach
                             }
-                            response.body.string()
+                            response.body?.string() ?: return@forEach
                         }
                     }.getOrNull() ?: return@forEach
                     Log.i(TAG, "template: $templateJson")

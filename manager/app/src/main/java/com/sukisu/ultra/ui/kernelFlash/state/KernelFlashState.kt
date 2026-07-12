@@ -101,7 +101,11 @@ class HorizonKernelWorker(
         state.startFlashing()
         state.updateStep(context.getString(R.string.horizon_preparing))
 
-        filePath = "${context.filesDir.absolutePath}/${DocumentFile.fromSingleUri(context, uri!!)?.name}"
+        val safeUri = uri ?: run {
+            state.setError(context.getString(R.string.horizon_unknown_error))
+            return
+        }
+        filePath = "${context.filesDir.absolutePath}/${DocumentFile.fromSingleUri(context, safeUri)?.name}"
         binaryPath = "${context.filesDir.absolutePath}/META-INF/com/google/android/update-binary"
         workDir = "${context.filesDir.absolutePath}/work"
 

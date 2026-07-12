@@ -135,7 +135,12 @@ static void fillArrayWithList(JNIEnv *env, jobject list, int *data, int count) {
 extern "C"
 JNIEXPORT jobject JNICALL
 Java_com_sukisu_ultra_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg, jint uid) {
-    if (env->GetStringLength(pkg) > KSU_MAX_PACKAGE_NAME) {
+    if (pkg == nullptr) {
+        auto cls = env->FindClass("com/sukisu/ultra/Natives$Profile");
+        auto constructor = env->GetMethodID(cls, "<init>", "()V");
+        return env->NewObject(cls, constructor);
+    }
+    if (env->GetStringLength(pkg) >= KSU_MAX_PACKAGE_NAME || env->GetStringUTFLength(pkg) >= KSU_MAX_PACKAGE_NAME) {
         return nullptr;
     }
 
@@ -233,6 +238,9 @@ Java_com_sukisu_ultra_Natives_getAppProfile(JNIEnv *env, jobject, jstring pkg, j
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_sukisu_ultra_Natives_setAppProfile(JNIEnv *env, jobject clazz, jobject profile) {
+    if (profile == nullptr) {
+        return JNI_FALSE;
+    }
     auto cls = env->FindClass("com/sukisu/ultra/Natives$Profile");
 
     auto keyField = env->GetFieldID(cls, "name", "Ljava/lang/String;");
@@ -424,7 +432,7 @@ Java_com_sukisu_ultra_Natives_getFullVersion(JNIEnv *env, jobject) {
     if (get_full_version(buff)) {
         return env->NewStringUTF(buff);
     }
-    return nullptr;
+    return env->NewStringUTF("");
 }
 
 extern "C"
@@ -434,5 +442,5 @@ Java_com_sukisu_ultra_Natives_getHookType(JNIEnv *env, jobject) {
     if (get_hook_type(hook_type)) {
         return env->NewStringUTF(hook_type);
     }
-    return nullptr;
+    return env->NewStringUTF("");
 }

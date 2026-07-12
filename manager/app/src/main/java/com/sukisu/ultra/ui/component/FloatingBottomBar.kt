@@ -193,7 +193,7 @@ fun FloatingBottomBar(
     val tabsBackdrop = rememberLayerBackdrop()
     val density = LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
-    val animationScope = rememberCoroutineScope()
+    val animationScope = rememberCoroutineScope() // lifecycle-aware, auto-cancels on disposal
 
     var tabWidthPx by remember { mutableFloatStateOf(0f) }
     var totalWidthPx by remember { mutableFloatStateOf(0f) }

@@ -2,11 +2,14 @@ package com.sukisu.ultra.ui.screen.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.sukisu.ultra.ui.LocalUiMode
 import com.sukisu.ultra.ui.UiMode
 import com.sukisu.ultra.ui.navigation3.Navigator
@@ -24,7 +27,11 @@ fun SettingPager(
     val viewModel = viewModel<SettingsViewModel>()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isKpmAvailable = rememberKpmAvailable()
-    val isSusfsSupported = getSuSFSStatus().equals("true", ignoreCase = true)
+    val isSusfsSupported by produceState(initialValue = false) {
+        value = withContext(Dispatchers.IO) {
+            getSuSFSStatus().equals("true", ignoreCase = true)
+        }
+    }
 
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()

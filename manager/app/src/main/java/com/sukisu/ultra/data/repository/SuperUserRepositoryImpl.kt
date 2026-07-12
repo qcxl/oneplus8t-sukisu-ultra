@@ -115,7 +115,11 @@ class SuperUserRepositoryImpl : SuperUserRepository {
 
                     override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                         if (cont.isActive) {
-                            cont.resume(binder as IBinder to this)
+                            if (binder != null) {
+                                cont.resume(binder to this)
+                            } else {
+                                cont.resume(Pair(null, this))
+                            }
                         }
                     }
                 }

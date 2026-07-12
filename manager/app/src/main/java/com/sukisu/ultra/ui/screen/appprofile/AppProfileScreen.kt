@@ -15,7 +15,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.sukisu.ultra.Natives
 import com.sukisu.ultra.R
 import com.sukisu.ultra.ui.LocalUiMode
@@ -59,15 +61,16 @@ fun AppProfileScreen(uid: Int) {
             ?: ""
     }
 
-    val initialProfile = remember(uid, packageName) {
-        Natives.getAppProfile(packageName, uid).also {
-            if (it.allowSu) {
-                it.rules = getSepolicy(packageName)
+    var profile by remember(uid, packageName) { mutableStateOf(Natives.Profile()) }
+
+    LaunchedEffect(uid, packageName) {
+        profile = withContext(Dispatchers.IO) {
+            Natives.getAppProfile(packageName, uid).also {
+                if (it.allowSu) {
+                    it.rules = getSepolicy(packageName)
+                }
             }
         }
-    }
-    var profile by rememberSaveable(uid, packageName) {
-        mutableStateOf(initialProfile)
     }
 
     val failToUpdateAppProfile = stringResource(R.string.failed_to_update_app_profile).format(primaryAppInfo.label)
@@ -106,22 +109,22 @@ fun AppProfileScreen(uid: Int) {
             navigator.push(Route.AppProfileTemplate)
         },
         onProfileChange = { updatedProfile ->
-            scope.launch {
+            scope.launch(Dispatchers.IO) {
                 if (updatedProfile.allowSu) {
                     if (uid < 2000 && uid != 1000) {
-                        showMessage(suNotAllowed)
+                        withContext(Dispatchers.Main) { showMessage(suNotAllowed) }
                         return@launch
                     }
                     if (!updatedProfile.rootUseDefault
                         && updatedProfile.rules.isNotEmpty()
                         && !setSepolicy(profile.name, updatedProfile.rules)
                     ) {
-                        showMessage(failToUpdateSepolicy)
+                        withContext(Dispatchers.Main) { showMessage(failToUpdateSepolicy) }
                         return@launch
                     }
                 }
                 if (!Natives.setAppProfile(updatedProfile)) {
-                    showMessage(failToUpdateAppProfile)
+                    withContext(Dispatchers.Main) { showMessage(failToUpdateAppProfile) }
                 } else {
                     profile = updatedProfile
                     if (uiMode == UiMode.Material) {
