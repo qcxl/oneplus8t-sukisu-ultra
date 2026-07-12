@@ -37,9 +37,12 @@ import java.io.File
 private const val TAG = "KsuCli"
 
 fun getKsuDaemonPath(): String {
-    // Prefer the system-installed ksud (at /data/adb/ksu/ksud) over bundled
-    // The app can exec this when SELinux is permissive (standard KSU setup)
-    return "/data/adb/ksu/ksud"
+    // Prefer bundled libksud.so (in app's native lib dir — always accessible,
+    // no /data/adb/ traversal needed). Avoids detection via /data/adb/ scan.
+    // Note: /data/adb/ permission is 700 (root only) for anti-detection.
+    val bundled = "${ksuApp.applicationInfo.nativeLibraryDir}/libksud.so"
+    // Skip canExecute() — it lies on some ROMs. Just try bundled first.
+    return bundled
 }
 
 data class FlashResult(val code: Int, val err: String, val showReboot: Boolean) {
@@ -80,37 +83,24 @@ fun Uri.getFileName(context: Context): String? {
 fun createRootShell(globalMnt: Boolean = false): Shell {
     Shell.enableVerboseLogging = BuildConfig.DEBUG
     val builder = Shell.Builder.create()
-    val ksuBin = "/data/adb/ksu/bin/ksud"
     return try {
-        // On Android 14+ (API 34+), File.canExecute() on paths under /data/adb/
-        // returns false due to app isolation, even when execution would succeed.
-        // Try both paths directly, skip canExecute() pre-check.
+        // Use bundled ksud first (app's native lib dir, always accessible)
         if (globalMnt) {
-            builder.build(ksuBin, "debug", "su", "-g")
+            builder.build(getKsuDaemonPath(), "debug", "su", "-g")
         } else {
-            builder.build(ksuBin, "debug", "su")
+            builder.build(getKsuDaemonPath(), "debug", "su")
         }
     } catch (e: Throwable) {
-        Log.w(TAG, "system ksud failed: ", e)
+        Log.w(TAG, "bundled ksud failed: ", e)
         try {
-            // Fallback to bundled ksud (in app's native lib dir, always accessible)
             if (globalMnt) {
-                builder.build(getKsuDaemonPath(), "debug", "su", "-g")
+                builder.build("su", "-mm")
             } else {
-                builder.build(getKsuDaemonPath(), "debug", "su")
+                builder.build("su")
             }
         } catch (e: Throwable) {
-            Log.w(TAG, "bundled ksud failed: ", e)
-            try {
-                if (globalMnt) {
-                    builder.build("su", "-mm")
-                } else {
-                    builder.build("su")
-                }
-            } catch (e: Throwable) {
-                Log.e(TAG, "su failed: ", e)
-                builder.build("sh")
-            }
+            Log.e(TAG, "su failed: ", e)
+            builder.build("sh")
         }
     }
 }
