@@ -104,82 +104,50 @@ class SuperUserRepositoryImpl : SuperUserRepository {
         }
     }
 
-    private suspend inline fun connectKsuService(
-        crossinline onDisconnect: () -> Unit = {}
-    ): Pair<IBinder, ServiceConnection> = withContext(Dispatchers.Main) {
-        runCatching {
-            withTimeout(15000L) {
-                suspendCancellableCoroutine { cont ->
-                    val connection = object : ServiceConnection {
-                        override fun onServiceDisconnected(name: ComponentName?) {
-                            onDisconnect()
-                        }
-
-                        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                            if (cont.isActive && binder != null) {
-                                cont.resume(binder to this)
-                            }
-                        }
-                    }
-
-                    cont.invokeOnCancellation {
-                        if (Looper.myLooper() == Looper.getMainLooper()) {
-                            RootService.unbind(connection)
-                        } else {
-                            Handler(Looper.getMainLooper()).post {
-                                RootService.unbind(connection)
-                            }
-                        }
-                    }
-
-                    val intent = Intent(ksuApp, KsuService::class.java)
-
-                    val task = RootService.bindOrTask(
-                        intent,
-                        Shell.EXECUTOR,
-                        connection,
-                    )
-                    val shell = KsuCli.SHELL
-                    task?.let { shell.execTask(it) }
-                }
+    private suspend fun connectOnce(
+        onDisconnect: () -> Unit
+    ): Pair<IBinder, ServiceConnection> = suspendCancellableCoroutine { cont ->
+        val connection = object : ServiceConnection {
+            override fun onServiceDisconnected(name: ComponentName?) {
+                onDisconnect()
             }
-        }.onFailure {
-            // force-stop can corrupt libsu's main.jar cache; delete it and retry once
-            Log.w(TAG, "connectKsuService timed out, clearing main.jar and retrying", it)
-            val mainJar = File(ksuApp.cacheDir, "main.jar")
-            if (mainJar.exists()) {
-                mainJar.delete()
-                Log.i(TAG, "deleted stale main.jar, retrying connectKsuService")
-            }
-        }.getOrElse {
-            // retry after cleanup
-            withTimeout(15000L) {
-                suspendCancellableCoroutine { cont ->
-                    val connection = object : ServiceConnection {
-                        override fun onServiceDisconnected(name: ComponentName?) {
-                            onDisconnect()
-                        }
-                        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                            if (cont.isActive && binder != null) {
-                                cont.resume(binder to this)
-                            }
-                        }
-                    }
-                    cont.invokeOnCancellation {
-                        if (Looper.myLooper() == Looper.getMainLooper()) {
-                            RootService.unbind(connection)
-                        } else {
-                            Handler(Looper.getMainLooper()).post {
-                                RootService.unbind(connection)
-                            }
-                        }
-                    }
-                    val intent = Intent(ksuApp, KsuService::class.java)
-                    val task = RootService.bindOrTask(intent, Shell.EXECUTOR, connection)
-                    val shell = KsuCli.SHELL
-                    task?.let { shell.execTask(it) }
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                if (cont.isActive && binder != null) {
+                    cont.resume(binder to this)
                 }
             }
         }
+        cont.invokeOnCancellation {
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                RootService.unbind(connection)
+            } else {
+                Handler(Looper.getMainLooper()).post {
+                    RootService.unbind(connection)
+                }
+            }
+        }
+        val intent = Intent(ksuApp, KsuService::class.java)
+        val task = RootService.bindOrTask(intent, Shell.EXECUTOR, connection)
+        val shell = KsuCli.SHELL
+        task?.let { shell.execTask(it) }
+    }
+
+    private suspend inline fun connectKsuService(
+        crossinline onDisconnect: () -> Unit = {}
+    ): Pair<IBinder, ServiceConnection> = withContext(Dispatchers.Main) {
+        val firstAttempt = runCatching {
+            withTimeout(15000L) { connectOnce(onDisconnect) }
+        }
+        if (firstAttempt.isSuccess) {
+            return@withContext firstAttempt.getOrThrow()
+        }
+        // force-stop can corrupt libsu's main.jar cache; delete it and retry once
+        Log.w(TAG, "connectKsuService failed, clearing main.jar and retrying", firstAttempt.exceptionOrNull())
+        val mainJar = File(ksuApp.cacheDir, "main.jar")
+        if (mainJar.exists()) {
+            mainJar.delete()
+            Log.i(TAG, "deleted stale main.jar, retrying connectKsuService")
+        }
+        withTimeout(15000L) { connectOnce(onDisconnect) }
     }
 }
