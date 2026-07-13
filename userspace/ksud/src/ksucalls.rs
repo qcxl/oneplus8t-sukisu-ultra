@@ -2,10 +2,10 @@
 use anyhow::bail;
 
 use crate::ksu_uapi;
+use core::ptr::addr_of_mut;
 use std::fs;
 use std::os::fd::RawFd;
 use std::sync::OnceLock;
-use core::ptr::addr_of_mut;
 
 // Global driver fd cache
 static DRIVER_FD: OnceLock<RawFd> = OnceLock::new();
