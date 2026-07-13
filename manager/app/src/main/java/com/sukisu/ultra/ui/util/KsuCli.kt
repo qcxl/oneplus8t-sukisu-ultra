@@ -235,41 +235,32 @@ private fun flashWithIO(
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit
 ): FlashIOResult {
-    // Use su -c to run the command directly (avoids libsu Shell's output capture issues
-    // with the sh -c chain). The ksud binary's stdout/stderr are read directly from the
-    // process streams.
-    return try {
-        val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
-        val stdoutLines = mutableListOf<String>()
-        val stderrLines = mutableListOf<String>()
+    // Use libsu Shell.cmd() which runs commands through the default root shell (via su).
+    // This is the same approach as KernelSU-Next.
+    val stdoutLines = mutableListOf<String>()
+    val stderrLines = mutableListOf<String>()
 
-        Thread {
-            proc.inputStream.bufferedReader().useLines { lines ->
-                lines.forEach { line ->
-                    synchronized(stdoutLines) { stdoutLines.add(line) }
-                    onStdout(line)
-                }
+    val result = Shell.cmd(cmd).to(
+        object : CallbackList<String?>() {
+            override fun onAddElement(s: String?) {
+                val line = s ?: ""
+                synchronized(stdoutLines) { stdoutLines.add(line) }
+                onStdout(line)
             }
-        }.apply { isDaemon = true }.start()
-
-        Thread {
-            proc.errorStream.bufferedReader().useLines { lines ->
-                lines.forEach { line ->
-                    synchronized(stderrLines) { stderrLines.add(line) }
-                    onStderr(line)
-                }
+        },
+        object : CallbackList<String?>() {
+            override fun onAddElement(s: String?) {
+                val line = s ?: ""
+                synchronized(stderrLines) { stderrLines.add(line) }
+                onStderr(line)
             }
-        }.apply { isDaemon = true }.start()
+        },
+    ).exec()
 
-        val code = proc.waitFor()
-        val out = synchronized(stdoutLines) { stdoutLines.toList() }
-        val err = synchronized(stderrLines) { stderrLines.toList() }
-        Log.i(TAG, "flashWithIO cmd=$cmd code=$code out=$out err=$err")
-        FlashIOResult(code = code, out = out, err = err)
-    } catch (e: Exception) {
-        Log.e(TAG, "flashWithIO failed: cmd=$cmd", e)
-        FlashIOResult(code = -1, out = emptyList(), err = listOf(e.toString()))
-    }
+    val out = synchronized(stdoutLines) { stdoutLines.toList() }
+    val err = synchronized(stderrLines) { stderrLines.toList() }
+    Log.i(TAG, "flashWithIO cmd=$cmd code=${result.code} out=$out err=$err")
+    return FlashIOResult(code = result.code, out = out, err = err)
 }
 
 fun flashModule(
