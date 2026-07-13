@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use android_logger::Config;
 use log::{LevelFilter, error, info};
-use std::io::Write;
 
 use crate::boot_patch::{BootPatchArgs, BootRestoreArgs};
 use crate::module::regenerate_preinit_rc;
