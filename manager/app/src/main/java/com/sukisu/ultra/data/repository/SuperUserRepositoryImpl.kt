@@ -1,29 +1,13 @@
 package com.sukisu.ultra.data.repository
 
-import android.content.ComponentName
-import android.content.Intent
-import android.content.ServiceConnection
 import android.content.pm.ApplicationInfo
-import android.os.Handler
-import android.os.IBinder
-import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
-import com.topjohnwu.superuser.Shell
-import com.topjohnwu.superuser.ipc.RootService
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
-import java.util.concurrent.TimeoutException
-import com.sukisu.zako.IKsuInterface
 import com.sukisu.ultra.Natives
 import com.sukisu.ultra.data.model.AppInfo
 import com.sukisu.ultra.ksuApp
-import com.sukisu.ultra.ui.KsuService
-import com.sukisu.ultra.ui.util.KsuCli
-import kotlin.coroutines.resume
-import java.io.File
 
 class SuperUserRepositoryImpl : SuperUserRepository {
 
@@ -33,63 +17,26 @@ class SuperUserRepositoryImpl : SuperUserRepository {
 
     override suspend fun getAppList(): Result<Pair<List<AppInfo>, List<Int>>> = withContext(Dispatchers.IO) {
         runCatching {
-            val result = connectKsuService {
-                Log.w(TAG, "KsuService disconnected")
+            val pm = ksuApp.packageManager
+            val start = SystemClock.elapsedRealtime()
+
+            val allPackages = pm.getInstalledPackages(0)
+
+            val newApps = allPackages.filter {
+                val ai = it.applicationInfo ?: return@filter false
+                (ai.flags and ApplicationInfo.FLAG_HAS_CODE) != 0
+            }.map {
+                val appInfo = it.applicationInfo!!
+                val profile = Natives.getAppProfile(it.packageName, appInfo.uid)
+                AppInfo(
+                    label = appInfo.loadLabel(pm).toString(),
+                    packageInfo = it,
+                    profile = profile,
+                )
             }
 
-            var currentBinder = result.first
-            var currentConnection = result.second
-
-            try {
-                suspend fun reconnect(): IKsuInterface {
-                    withContext(Dispatchers.Main) {
-                        RootService.unbind(currentConnection)
-                    }
-                    val retry = connectKsuService { Log.w(TAG, "KsuService disconnected") }
-                    currentBinder = retry.first
-                    currentConnection = retry.second
-                    return IKsuInterface.Stub.asInterface(currentBinder)
-                }
-
-                val pm = ksuApp.packageManager
-                val start = SystemClock.elapsedRealtime()
-
-                var iface = IKsuInterface.Stub.asInterface(currentBinder)
-                val idsArray = try {
-                    iface.userIds
-                } catch (_: Exception) {
-                    iface = reconnect()
-                    iface.userIds
-                }
-
-                val slice = try {
-                    iface.getPackages(0)
-                } catch (_: Exception) {
-                    iface = reconnect()
-                    iface.getPackages(0)
-                }
-
-                val packages = slice.list
-                val newApps = packages.filter {
-                    val ai = it.applicationInfo ?: return@filter false
-                    (ai.flags and ApplicationInfo.FLAG_HAS_CODE) != 0
-                }.map {
-                    val appInfo = it.applicationInfo!!
-                    val profile = Natives.getAppProfile(it.packageName, appInfo.uid)
-                    AppInfo(
-                        label = appInfo.loadLabel(pm).toString(),
-                        packageInfo = it,
-                        profile = profile,
-                    )
-                }
-
-                Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}")
-                Pair(newApps, idsArray.toList())
-            } finally {
-                withContext(Dispatchers.Main) {
-                    RootService.unbind(currentConnection)
-                }
-            }
+            Log.i(TAG, "load cost: ${SystemClock.elapsedRealtime() - start}, apps: ${newApps.size}")
+            Pair(newApps, listOf(0))
         }
     }
 
@@ -102,52 +49,5 @@ class SuperUserRepositoryImpl : SuperUserRepository {
                 it.copy(profile = profile)
             }
         }
-    }
-
-    private suspend fun connectOnce(
-        onDisconnect: () -> Unit
-    ): Pair<IBinder, ServiceConnection> = suspendCancellableCoroutine { cont ->
-        val connection = object : ServiceConnection {
-            override fun onServiceDisconnected(name: ComponentName?) {
-                onDisconnect()
-            }
-            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                if (cont.isActive && binder != null) {
-                    cont.resume(binder to this)
-                }
-            }
-        }
-        cont.invokeOnCancellation {
-            if (Looper.myLooper() == Looper.getMainLooper()) {
-                RootService.unbind(connection)
-            } else {
-                Handler(Looper.getMainLooper()).post {
-                    RootService.unbind(connection)
-                }
-            }
-        }
-        val intent = Intent(ksuApp, KsuService::class.java)
-        val task = RootService.bindOrTask(intent, Shell.EXECUTOR, connection)
-        val shell = KsuCli.SHELL
-        task?.let { shell.execTask(it) }
-    }
-
-    private suspend inline fun connectKsuService(
-        crossinline onDisconnect: () -> Unit = {}
-    ): Pair<IBinder, ServiceConnection> = withContext(Dispatchers.Main) {
-        val firstAttempt = runCatching {
-            withTimeout(15000L) { connectOnce { onDisconnect() } }
-        }
-        if (firstAttempt.isSuccess) {
-            return@withContext firstAttempt.getOrThrow()
-        }
-        // force-stop can corrupt libsu's main.jar cache; delete it and retry once
-        Log.w(TAG, "connectKsuService failed, clearing main.jar and retrying", firstAttempt.exceptionOrNull())
-        val mainJar = File(ksuApp.cacheDir, "main.jar")
-        if (mainJar.exists()) {
-            mainJar.delete()
-            Log.i(TAG, "deleted stale main.jar, retrying connectKsuService")
-        }
-        withTimeout(15000L) { connectOnce { onDisconnect() } }
     }
 }

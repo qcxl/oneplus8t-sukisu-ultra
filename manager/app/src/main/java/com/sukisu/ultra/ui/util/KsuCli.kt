@@ -80,28 +80,31 @@ fun Uri.getFileName(context: Context): String? {
     return fileName
 }
 
+fun createRootShellBuilder(globalMnt: Boolean = false): Shell.Builder {
+    return Shell.Builder.create().run {
+        val cmd = buildString {
+            append(getKsuDaemonPath())
+            append(" debug su")
+            if (globalMnt) append(" -g")
+            append(" || ")
+            append("su")
+            if (globalMnt) append(" --mount-master")
+            append(" || ")
+            append("sh")
+        }
+        setCommands("sh", "-c", cmd)
+    }
+}
+
 fun createRootShell(globalMnt: Boolean = false): Shell {
     Shell.enableVerboseLogging = BuildConfig.DEBUG
-    val builder = Shell.Builder.create()
-    return try {
-        // Use bundled ksud first (app's native lib dir, always accessible)
-        if (globalMnt) {
-            builder.build(getKsuDaemonPath(), "debug", "su", "-g")
-        } else {
-            builder.build(getKsuDaemonPath(), "debug", "su")
-        }
-    } catch (e: Throwable) {
-        Log.w(TAG, "bundled ksud failed: ", e)
-        try {
-            if (globalMnt) {
-                builder.build("su", "-mm")
-            } else {
-                builder.build("su")
-            }
-        } catch (e: Throwable) {
-            Log.e(TAG, "su failed: ", e)
-            builder.build("sh")
-        }
+    return runCatching {
+        createRootShellBuilder(globalMnt).build()
+    }.getOrElse { e ->
+        Log.w(TAG, "su failed: ", e)
+        Shell.Builder.create().apply {
+            if (globalMnt) setFlags(Shell.FLAG_MOUNT_MASTER)
+        }.build()
     }
 }
 

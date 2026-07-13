@@ -21,7 +21,6 @@ import com.sukisu.ultra.ui.LocalUiMode
 import com.sukisu.ultra.ui.UiMode
 import com.sukisu.ultra.ui.navigation3.LocalNavigator
 import com.sukisu.ultra.ui.navigation3.Route
-import com.sukisu.ultra.ui.util.isNetworkAvailable
 import com.sukisu.ultra.ui.viewmodel.TemplateViewModel
 
 @Composable
@@ -67,7 +66,7 @@ fun AppProfileTemplateScreen() {
         }
     }
 
-    val uiState = screenState.copy(offline = screenState.offline || !isNetworkAvailable(context))
+    val uiState = screenState
     val actions = TemplateActions(
         onBack = dropUnlessResumed { navigator.pop() },
         onRefresh = { forceSync ->
