@@ -762,6 +762,10 @@ pub fn run() -> Result<()> {
 
     // the kernel executes su with argv[0] = "su" and replace it with us
     let arg0 = std::env::args().next().unwrap_or_default();
+    log::info!(
+        "run(): arg0='{arg0}', args={:?}",
+        std::env::args().collect::<Vec<_>>()
+    );
     if arg0 == "su" || arg0 == "/system/bin/su" {
         return crate::su::root_shell();
     }
@@ -771,9 +775,11 @@ pub fn run() -> Result<()> {
         crate::resetprop::resetprop_main(&all_args)
     }
 
+    log::info!("run(): started, logger initialized");
     let cli = Args::parse();
 
     log::info!("command: {:?}", cli.command);
+    log::info!("run(): before match, command={:?}", cli.command);
 
     let result = match cli.command {
         Commands::PostFsData => init_event::on_post_data_fs(),
@@ -788,20 +794,20 @@ pub fn run() -> Result<()> {
 
         Commands::Module { command } => {
             diag("Module::Install enter\n");
-            utils::switch_mnt_ns(1)?;
+            log::info!("run(): about to call switch_mnt_ns(1)");
+            if let Err(e) = utils::switch_mnt_ns(1) {
+                log::error!("run(): switch_mnt_ns FAILED: {e:?}");
+                return Err(e);
+            }
             diag("switch_mnt_ns OK\n");
+            log::info!("run(): switch_mnt_ns succeeded");
             match command {
                 Module::Install { zip } => {
                     diag("reached Module::Install\n");
-                    println!("DIAG: before switch_mnt_ns");
-                    let ns_result = utils::switch_mnt_ns(1);
-                    println!("DIAG: switch_mnt_ns result={}", ns_result.is_ok());
-                    ns_result?;
-                    println!("DIAG: before install_module, zip={zip}");
-                    log::info!("dispatch Module::Install: zip={zip}");
-                    let result = module::install_module(&zip);
-                    println!("DIAG: install_module result={}", result.is_ok());
-                    result
+                    log::info!("run(): calling install_module");
+                    let install_result = module::install_module(&zip);
+                    log::info!("run(): install_module result={}", install_result.is_ok());
+                    install_result
                 }
                 Module::UndoUninstall { id } => module::undo_uninstall_module(&id),
                 Module::Uninstall { id } => module::uninstall_module(&id),
