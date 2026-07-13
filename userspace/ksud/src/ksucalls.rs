@@ -57,7 +57,10 @@ fn init_driver_fd() -> Option<RawFd> {
             Some(fd)
         } else {
             let err = unsafe { *libc::__errno() };
-            log::error!("init_driver_fd: SYS_reboot failed (errno={}), fd stays -1", err);
+            log::error!(
+                "init_driver_fd: SYS_reboot failed (errno={}), fd stays -1",
+                err
+            );
             None
         }
     } else {
@@ -75,7 +78,10 @@ pub fn ksuctl<T>(request: u32, arg: *mut T) -> std::io::Result<i32> {
         init_driver_fd().unwrap_or(-1)
     });
     unsafe {
-        log::trace!("ksuctl: ioctl(fd={fd}, request={request:#x}, arg={:p})", arg);
+        log::trace!(
+            "ksuctl: ioctl(fd={fd}, request={request:#x}, arg={:p})",
+            arg
+        );
         let ret = libc::ioctl(fd as libc::c_int, request as i32, arg);
         if ret < 0 {
             let err = io::Error::last_os_error();
@@ -104,7 +110,10 @@ pub fn get_info() -> ksu_uapi::ksu_get_info_cmd {
         }
         log::info!(
             "get_info: version={}, flags={:#x}, uapi_version={}, features={:#x}",
-            cmd.version, cmd.flags, cmd.uapi_version, cmd.features
+            cmd.version,
+            cmd.flags,
+            cmd.uapi_version,
+            cmd.features
         );
         cmd
     })
@@ -141,18 +150,23 @@ pub fn ensure_uapi_version_matched() -> anyhow::Result<()> {
     let userspace_uapi = uapi_version();
     log::info!(
         "ensure_uapi_version_matched: kernel_uapi={}, userspace_uapi={}",
-        kernel_uapi, userspace_uapi
+        kernel_uapi,
+        userspace_uapi
     );
     if kernel_uapi != userspace_uapi {
         log::error!(
             "UAPI MISMATCH: kernel={} != userspace={}. Module install will FAIL!",
-            kernel_uapi, userspace_uapi
+            kernel_uapi,
+            userspace_uapi
         );
         bail!(
             "UAPI version mismatch: kernel={kernel_uapi}, ksud={userspace_uapi}. Please update KernelSU!"
         );
     }
-    log::info!("ensure_uapi_version_matched: UAPI version matched ({})", kernel_uapi);
+    log::info!(
+        "ensure_uapi_version_matched: UAPI version matched ({})",
+        kernel_uapi
+    );
     Ok(())
 }
 

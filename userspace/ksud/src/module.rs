@@ -119,7 +119,10 @@ fn exec_install_script(module_file: &str, is_metamodule: bool, module_id: &str) 
     // Check busybox availability
     let bb_path = assets::BUSYBOX_PATH;
     let bb_exists = std::path::Path::new(bb_path).exists();
-    debug!("exec_install_script: busybox path={}, exists={}", bb_path, bb_exists);
+    debug!(
+        "exec_install_script: busybox path={}, exists={}",
+        bb_path, bb_exists
+    );
 
     info!("exec_install_script: Running installer script via busybox sh...");
     let result = Command::new(bb_path)
@@ -134,7 +137,11 @@ fn exec_install_script(module_file: &str, is_metamodule: bool, module_id: &str) 
         result.code().unwrap_or(-1),
         result.success()
     );
-    ensure!(result.success(), "Failed to install module script (exit code={})", result.code().unwrap_or(-1));
+    ensure!(
+        result.success(),
+        "Failed to install module script (exit code={})",
+        result.code().unwrap_or(-1)
+    );
     info!("exec_install_script: installer script completed successfully");
     Ok(())
 }
@@ -143,9 +150,15 @@ fn exec_install_script(module_file: &str, is_metamodule: bool, module_id: &str) 
 fn ensure_boot_completed() -> Result<()> {
     // ensure getprop sys.boot_completed == 1
     let boot_prop = getprop("sys.boot_completed");
-    info!("ensure_boot_completed: getprop sys.boot_completed = {:?}", boot_prop);
+    info!(
+        "ensure_boot_completed: getprop sys.boot_completed = {:?}",
+        boot_prop
+    );
     if boot_prop.as_deref() != Some("1") {
-        error!("ensure_boot_completed FAILED: sys.boot_completed != 1, got {:?}", boot_prop);
+        error!(
+            "ensure_boot_completed FAILED: sys.boot_completed != 1, got {:?}",
+            boot_prop
+        );
         bail!("Android is Booting!");
     }
     info!("ensure_boot_completed: OK (sys.boot_completed=1)");
@@ -723,12 +736,19 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     let entry_path = PathBuf::from_str("module.prop")?;
     let zip_path = PathBuf::from_str(zip)?;
     info!("install_module_to_system: canonicalizing zip path...");
-    let zip_path = zip_path.canonicalize()
+    let zip_path = zip_path
+        .canonicalize()
         .with_context(|| format!("Failed to canonicalize zip path: {zip}"))?;
-    info!("install_module_to_system: zip path -> {}", zip_path.display());
+    info!(
+        "install_module_to_system: zip path -> {}",
+        zip_path.display()
+    );
     zip_extract_file_to_memory(&zip_path, &entry_path, &mut buffer)
         .with_context(|| format!("Failed to extract module.prop from zip: {zip}"))?;
-    info!("install_module_to_system: module.prop extracted ({} bytes)", buffer.len());
+    info!(
+        "install_module_to_system: module.prop extracted ({} bytes)",
+        buffer.len()
+    );
 
     info!("install_module_to_system: parsing module.prop...");
     let mut module_prop = HashMap::new();
@@ -750,7 +770,10 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     info!("install_module_to_system: validating module_id format...");
     validate_module_id(module_id)
         .with_context(|| format!("Invalid module ID in module.prop: '{module_id}'"))?;
-    info!("install_module_to_system: module_id '{}' is valid", module_id);
+    info!(
+        "install_module_to_system: module_id '{}' is valid",
+        module_id
+    );
 
     // Check if this module is a metamodule
     let is_metamodule = metamodule::is_metamodule(&module_prop);
@@ -758,7 +781,10 @@ fn install_module_to_system(zip: &str) -> Result<()> {
 
     // Check if it's safe to install regular module
     if !is_metamodule && let Err(is_disabled) = metamodule::check_install_safety() {
-        warn!("install_module_to_system: metamodule blocking install (is_disabled={})", is_disabled);
+        warn!(
+            "install_module_to_system: metamodule blocking install (is_disabled={})",
+            is_disabled
+        );
         println!("\n❌ Installation Blocked");
         println!("┌────────────────────────────────");
         println!("│ A metamodule with custom installer is active");
@@ -790,7 +816,10 @@ fn install_module_to_system(zip: &str) -> Result<()> {
                 .unwrap_or_else(|| "unknown".to_string());
 
             if existing_id != module_id {
-                error!("install_module_to_system: metamodule conflict: existing_id={}, new_id={}", existing_id, module_id);
+                error!(
+                    "install_module_to_system: metamodule conflict: existing_id={}, new_id={}",
+                    existing_id, module_id
+                );
                 println!("\n❌ Installation Failed");
                 println!("┌────────────────────────────────");
                 println!("│ A metamodule is already installed");
@@ -827,21 +856,30 @@ fn install_module_to_system(zip: &str) -> Result<()> {
 
     // Prepare target directory
     println!("- Installing to {}", updated_dir.display());
-    info!("install_module_to_system: preparing target dir: {}", updated_dir.display());
+    info!(
+        "install_module_to_system: preparing target dir: {}",
+        updated_dir.display()
+    );
     ensure_clean_dir(&updated_dir)?;
     info!("target dir: {}", updated_dir.display());
 
     // Extract zip to target directory
     println!("- Extracting module files");
     info!("install_module_to_system: opening zip file for extraction...");
-    let file = File::open(zip)
-        .with_context(|| format!("Failed to open zip file: {zip}"))?;
+    let file = File::open(zip).with_context(|| format!("Failed to open zip file: {zip}"))?;
     let mut archive = zip::ZipArchive::new(file)
         .with_context(|| format!("Failed to parse zip archive: {zip}"))?;
-    info!("install_module_to_system: zip contains {} entries", archive.len());
-    archive.extract(&updated_dir)
+    info!(
+        "install_module_to_system: zip contains {} entries",
+        archive.len()
+    );
+    archive
+        .extract(&updated_dir)
         .with_context(|| format!("Failed to extract zip to {}", updated_dir.display()))?;
-    info!("install_module_to_system: zip extracted to {} OK", updated_dir.display());
+    info!(
+        "install_module_to_system: zip extracted to {} OK",
+        updated_dir.display()
+    );
 
     // Set permission and selinux context for $MOD/system
     let module_system_dir = updated_dir.join("system");
@@ -860,7 +898,10 @@ fn install_module_to_system(zip: &str) -> Result<()> {
     info!("install_module_to_system: installer script completed OK");
 
     let module_dir = Path::new(MODULE_DIR).join(module_id);
-    info!("install_module_to_system: ensuring module dir: {}", module_dir.display());
+    info!(
+        "install_module_to_system: ensuring module dir: {}",
+        module_dir.display()
+    );
     ensure_dir_exists(&module_dir)?;
     info!("install_module_to_system: copying module.prop...");
     copy(
@@ -898,7 +939,10 @@ pub fn install_module(zip: &str) -> Result<()> {
     } else if let Err(e) = regenerate_preinit_rc() {
         warn!("regenerate preinit rc failed: {e}");
     }
-    info!("install_module: END, result={}", if result.is_ok() { "OK" } else { "FAILED" });
+    info!(
+        "install_module: END, result={}",
+        if result.is_ok() { "OK" } else { "FAILED" }
+    );
     result
 }
 

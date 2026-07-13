@@ -76,9 +76,16 @@ pub fn ensure_dir_exists<T: AsRef<Path>>(dir: T) -> Result<()> {
         return Ok(());
     }
 
-    log::info!("ensure_dir_exists: {} does not exist, creating...", dir.display());
+    log::info!(
+        "ensure_dir_exists: {} does not exist, creating...",
+        dir.display()
+    );
     if let Err(e) = create_dir_all(dir) {
-        log::warn!("ensure_dir_exists: create_dir_all({}) FAILED: {}", dir.display(), e);
+        log::warn!(
+            "ensure_dir_exists: create_dir_all({}) FAILED: {}",
+            dir.display(),
+            e
+        );
         // Fallback: use shell mkdir -p (handles SELinux/mount namespace quirks)
         let fallback_cmd = format!("mkdir -p '{}'", dir.display());
         log::warn!("ensure_dir_exists: falling back to '{}'", fallback_cmd);
@@ -99,16 +106,28 @@ pub fn ensure_dir_exists<T: AsRef<Path>>(dir: T) -> Result<()> {
         }
         log::info!("ensure_dir_exists: mkdir -p {} succeeded", dir.display());
     } else {
-        log::debug!("ensure_dir_exists: create_dir_all({}) succeeded", dir.display());
+        log::debug!(
+            "ensure_dir_exists: create_dir_all({}) succeeded",
+            dir.display()
+        );
     }
 
     // Final verification
     if dir.is_dir() {
-        log::info!("ensure_dir_exists: {} is now a valid directory", dir.display());
+        log::info!(
+            "ensure_dir_exists: {} is now a valid directory",
+            dir.display()
+        );
         Ok(())
     } else {
-        log::error!("ensure_dir_exists: {} STILL not a directory after all attempts!", dir.display());
-        bail!("{} is not a regular directory (all methods failed)", dir.display())
+        log::error!(
+            "ensure_dir_exists: {} STILL not a directory after all attempts!",
+            dir.display()
+        );
+        bail!(
+            "{} is not a regular directory (all methods failed)",
+            dir.display()
+        )
     }
 }
 

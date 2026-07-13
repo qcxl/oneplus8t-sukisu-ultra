@@ -25,25 +25,36 @@ pub fn set_template(id: String, template: String) -> Result<()> {
 
     // Ensure parent directories exist level by level for clearer error reporting
     log::debug!("set_template: ensuring WORKING_DIR (/data/adb/ksu/)...");
-    ensure_dir_exists(defs::WORKING_DIR).with_context(|| {
-        format!("Failed to create WORKING_DIR for template '{}'", id)
-    })?;
+    ensure_dir_exists(defs::WORKING_DIR)
+        .with_context(|| format!("Failed to create WORKING_DIR for template '{}'", id))?;
     log::debug!("set_template: ensuring PROFILE_DIR (/data/adb/ksu/profile/)...");
-    ensure_dir_exists(defs::PROFILE_DIR).with_context(|| {
-        format!("Failed to create PROFILE_DIR for template '{}'", id)
-    })?;
-    log::debug!("set_template: ensuring PROFILE_TEMPLATE_DIR (/data/adb/ksu/profile/templates/)...");
+    ensure_dir_exists(defs::PROFILE_DIR)
+        .with_context(|| format!("Failed to create PROFILE_DIR for template '{}'", id))?;
+    log::debug!(
+        "set_template: ensuring PROFILE_TEMPLATE_DIR (/data/adb/ksu/profile/templates/)..."
+    );
     ensure_dir_exists(defs::PROFILE_TEMPLATE_DIR).with_context(|| {
-        format!("Failed to create PROFILE_TEMPLATE_DIR for template '{}'", id)
+        format!(
+            "Failed to create PROFILE_TEMPLATE_DIR for template '{}'",
+            id
+        )
     })?;
 
     let template_file = Path::new(defs::PROFILE_TEMPLATE_DIR).join(id.as_str());
     log::info!("set_template: writing to {}", template_file.display());
     if let Err(e) = std::fs::write(&template_file, template.as_bytes()) {
-        log::error!("set_template: failed to write {}: {}", template_file.display(), e);
+        log::error!(
+            "set_template: failed to write {}: {}",
+            template_file.display(),
+            e
+        );
         return Err(e).context(format!("Failed to write template '{}'", id));
     }
-    log::info!("set_template: template {} saved successfully ({} bytes)", id, template.len());
+    log::info!(
+        "set_template: template {} saved successfully ({} bytes)",
+        id,
+        template.len()
+    );
     Ok(())
 }
 
