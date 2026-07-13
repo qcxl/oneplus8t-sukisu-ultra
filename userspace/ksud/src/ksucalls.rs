@@ -39,10 +39,11 @@ fn init_driver_fd() -> Option<RawFd> {
     if fd.is_none() {
         let mut fd: i32 = -1;
 
-        // Method 1: prctl(0xDEADBEEF, 0xCAFEBABE) — seccomp-safe.
+        // prctl(0xDEADBEEF, 0xCAFEBABE) — seccomp-safe fd installation.
         // Unlike SYS_reboot, prctl is NOT blocked by seccomp for
         // untrusted_app processes, so this works even when ksud runs
         // as the app user (before the su fallback in createRootShell).
+        // Requires the kernel to have a prctl kprobe handler.
         unsafe {
             log::info!(
                 "init_driver_fd: Trying prctl(magic1={:#x}, magic2={:#x})",
@@ -61,34 +62,20 @@ fn init_driver_fd() -> Option<RawFd> {
             log::info!("init_driver_fd: prctl returned fd={fd}");
             return Some(fd);
         }
-        log::warn!("init_driver_fd: prctl failed (fd={fd}), trying SYS_reboot...");
 
-        // Method 2: SYS_reboot — works when process is root (no seccomp).
-        // For untrusted_app, seccomp kills the process with SIGSYS;
-        // the shell's `|| su` fallback (in createRootShellBuilder) handles this.
-        unsafe {
-            log::info!(
-                "init_driver_fd: Calling SYS_reboot(magic1={:#x}, magic2={:#x})",
-                ksu_uapi::KSU_INSTALL_MAGIC1,
-                ksu_uapi::KSU_INSTALL_MAGIC2
-            );
-            libc::syscall(
-                libc::SYS_reboot,
-                ksu_uapi::KSU_INSTALL_MAGIC1,
-                ksu_uapi::KSU_INSTALL_MAGIC2,
-                0,
-                0,
-                &mut fd,
-            );
-        };
-        if fd >= 0 {
-            log::info!("init_driver_fd: SYS_reboot returned fd={fd}");
-            Some(fd)
-        } else {
-            let err = unsafe { *libc::__errno() };
-            log::error!("init_driver_fd: all methods failed (errno={err}), fd stays -1");
-            None
-        }
+        // prctl did not succeed (kernel may not have the prctl kprobe).
+        // Do NOT fall through to SYS_reboot: seccomp blocks SYS_reboot
+        // for untrusted_app processes (even after su), causing SIGSYS
+        // which kills the entire ksud before any error handling runs.
+        // Instead, gracefully return None — callers handle fd==-1 by
+        // returning default values (uapi=0, version=0, etc.) without
+        // blocking functionality that doesn't need the fd (module
+        // install, templates — both pure filesystem ops).
+        log::warn!(
+            "init_driver_fd: prctl failed (fd={fd}), no SYS_reboot fallback \
+             (blocked by seccomp), returning None"
+        );
+        None
     } else {
         log::info!("init_driver_fd: using existing fd from /proc/self/fd");
         fd
