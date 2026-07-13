@@ -20,27 +20,24 @@ pub fn get_sepolicy(pkg: String) -> Result<()> {
 }
 
 // ksud doesn't guarteen the correctness of template, it just save
-pub fn set_template(id: String, template: String) -> Result<()> {
-    log::info!("set_template: id={}, template_len={}", id, template.len());
+pub fn set_template(id: &str, template: &str) -> Result<()> {
+    let template_len = template.len();
+    log::info!("set_template: id={id}, template_len={template_len}");
 
     // Ensure parent directories exist level by level for clearer error reporting
     log::debug!("set_template: ensuring WORKING_DIR (/data/adb/ksu/)...");
     ensure_dir_exists(defs::WORKING_DIR)
-        .with_context(|| format!("Failed to create WORKING_DIR for template '{}'", id))?;
+        .with_context(|| format!("Failed to create WORKING_DIR for template '{id}'"))?;
     log::debug!("set_template: ensuring PROFILE_DIR (/data/adb/ksu/profile/)...");
     ensure_dir_exists(defs::PROFILE_DIR)
-        .with_context(|| format!("Failed to create PROFILE_DIR for template '{}'", id))?;
+        .with_context(|| format!("Failed to create PROFILE_DIR for template '{id}'"))?;
     log::debug!(
         "set_template: ensuring PROFILE_TEMPLATE_DIR (/data/adb/ksu/profile/templates/)..."
     );
-    ensure_dir_exists(defs::PROFILE_TEMPLATE_DIR).with_context(|| {
-        format!(
-            "Failed to create PROFILE_TEMPLATE_DIR for template '{}'",
-            id
-        )
-    })?;
+    ensure_dir_exists(defs::PROFILE_TEMPLATE_DIR)
+        .with_context(|| format!("Failed to create PROFILE_TEMPLATE_DIR for template '{id}'"))?;
 
-    let template_file = Path::new(defs::PROFILE_TEMPLATE_DIR).join(id.as_str());
+    let template_file = Path::new(defs::PROFILE_TEMPLATE_DIR).join(id);
     log::info!("set_template: writing to {}", template_file.display());
     if let Err(e) = std::fs::write(&template_file, template.as_bytes()) {
         log::error!(
@@ -48,13 +45,9 @@ pub fn set_template(id: String, template: String) -> Result<()> {
             template_file.display(),
             e
         );
-        return Err(e).context(format!("Failed to write template '{}'", id));
+        return Err(e).context(format!("Failed to write template '{id}'"));
     }
-    log::info!(
-        "set_template: template {} saved successfully ({} bytes)",
-        id,
-        template.len()
-    );
+    log::info!("set_template: template {id} saved successfully ({template_len} bytes)");
     Ok(())
 }
 

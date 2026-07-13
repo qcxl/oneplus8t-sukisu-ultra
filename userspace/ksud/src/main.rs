@@ -1,4 +1,5 @@
 #![deny(clippy::all, clippy::pedantic)]
+#![allow(clippy::uninlined_format_args)]
 #![warn(clippy::nursery)]
 #![allow(
     clippy::module_name_repetitions,

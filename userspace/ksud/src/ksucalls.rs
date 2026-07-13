@@ -19,9 +19,9 @@ fn scan_driver_fd() -> Option<RawFd> {
             let link_path = format!("/proc/self/fd/{fd_num}");
             if let Ok(target) = fs::read_link(&link_path) {
                 let target_str = target.to_string_lossy();
-                log::trace!("scan_driver_fd: fd={}, target={}", fd_num, target_str);
+                log::trace!("scan_driver_fd: fd={fd_num}, target={target_str}");
                 if target_str.contains("[ksu_driver]") {
-                    log::info!("scan_driver_fd: found ksu_driver at fd={}", fd_num);
+                    log::info!("scan_driver_fd: found ksu_driver at fd={fd_num}");
                     return Some(fd_num);
                 }
             }
@@ -53,14 +53,11 @@ fn init_driver_fd() -> Option<RawFd> {
             );
         };
         if fd >= 0 {
-            log::info!("init_driver_fd: SYS_reboot returned fd={}", fd);
+            log::info!("init_driver_fd: SYS_reboot returned fd={fd}");
             Some(fd)
         } else {
             let err = unsafe { *libc::__errno() };
-            log::error!(
-                "init_driver_fd: SYS_reboot failed (errno={}), fd stays -1",
-                err
-            );
+            log::error!("init_driver_fd: SYS_reboot failed (errno={err}), fd stays -1");
             None
         }
     } else {
@@ -85,10 +82,10 @@ pub fn ksuctl<T>(request: u32, arg: *mut T) -> std::io::Result<i32> {
         let ret = libc::ioctl(fd as libc::c_int, request as i32, arg);
         if ret < 0 {
             let err = io::Error::last_os_error();
-            log::error!("ksuctl FAILED (fd={}, request={:#x}): {}", fd, request, err);
+            log::error!("ksuctl FAILED (fd={fd}, request={request:#x}): {err}");
             Err(err)
         } else {
-            log::trace!("ksuctl OK (fd={}, request={:#x}): {}", fd, request, ret);
+            log::trace!("ksuctl OK (fd={fd}, request={request:#x}): {ret}");
             Ok(ret)
         }
     }
