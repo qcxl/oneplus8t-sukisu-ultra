@@ -72,10 +72,13 @@ static inline int scan_driver_fd() {
     }
 
     // Fallback 2: request fd via prctl(0xDEADBEEF, 0xCAFEBABE, ...)
+    // NOTE: 0xCAFEBABE must be passed as unsigned long (zero-extended to 64-bit on arm64).
+    // Passing as int causes sign-extension to 0xFFFFFFFFCAFEBABE, which != kernel's
+    // KSU_INSTALL_MAGIC2 (0x00000000CAFEBABE) → comparison fails → fd never installed.
     {
         int ksu_fd = -1;
         prctl(static_cast<int>(0xDEADBEEF),
-              static_cast<int>(0xCAFEBABE),
+              static_cast<unsigned long>(0xCAFEBABE),
               reinterpret_cast<unsigned long>(&ksu_fd), 0, 0);
         if (ksu_fd >= 0) return ksu_fd;
     }
