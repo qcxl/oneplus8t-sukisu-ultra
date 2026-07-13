@@ -32,14 +32,19 @@ fn scan_driver_fd() -> Option<RawFd> {
 fn init_driver_fd() -> Option<RawFd> {
     let fd = scan_driver_fd();
     if fd.is_none() {
-        let mut fd = -1;
+        let mut fd: i32 = -1;
         unsafe {
-            libc::syscall(
-                libc::SYS_reboot,
-                ksu_uapi::KSU_INSTALL_MAGIC1,
-                ksu_uapi::KSU_INSTALL_MAGIC2,
+            // Use prctl instead of SYS_reboot: seccomp blocks __NR_reboot for
+            // untrusted_app processes, killing libksud.so with SIGSYS before the
+            // kernel's reboot kprobe ever runs. prctl(0xDEADBEEF, ...) bypasses
+            // seccomp and installs the fd in the calling process via the kernel's
+            // ksu_handle_prctl hook (injected into kernel/sys.c by CI).
+            libc::prctl(
+                ksu_uapi::KSU_INSTALL_MAGIC1 as libc::c_int,
+                ksu_uapi::KSU_INSTALL_MAGIC2 as libc::c_ulong,
+                &mut fd as *mut i32 as libc::c_ulong,
                 0,
-                &mut fd,
+                0,
             );
         };
         if fd >= 0 { Some(fd) } else { None }
