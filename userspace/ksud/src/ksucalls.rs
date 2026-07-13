@@ -175,24 +175,25 @@ pub fn ensure_uapi_version_matched() -> anyhow::Result<()> {
     let kernel_uapi = get_info().uapi_version;
     let userspace_uapi = uapi_version();
     log::info!(
-        "ensure_uapi_version_matched: kernel_uapi={}, userspace_uapi={}",
-        kernel_uapi,
-        userspace_uapi
+        "ensure_uapi_version_matched: kernel_uapi={kernel_uapi}, userspace_uapi={userspace_uapi}"
     );
+    if kernel_uapi == 0 && userspace_uapi > 0 {
+        log::warn!(
+            "ensure_uapi_version_matched: kernel_uapi=0 (fd unavailable — seccomp blocked \
+             SYS_reboot), skipping check — assuming compatibility"
+        );
+        return Ok(());
+    }
     if kernel_uapi != userspace_uapi {
         log::error!(
-            "UAPI MISMATCH: kernel={} != userspace={}. Module install will FAIL!",
-            kernel_uapi,
-            userspace_uapi
+            "UAPI MISMATCH: kernel={kernel_uapi} != userspace={userspace_uapi}. \
+             Module install will FAIL!"
         );
         bail!(
             "UAPI version mismatch: kernel={kernel_uapi}, ksud={userspace_uapi}. Please update KernelSU!"
         );
     }
-    log::info!(
-        "ensure_uapi_version_matched: UAPI version matched ({})",
-        kernel_uapi
-    );
+    log::info!("ensure_uapi_version_matched: UAPI version matched ({kernel_uapi})");
     Ok(())
 }
 
