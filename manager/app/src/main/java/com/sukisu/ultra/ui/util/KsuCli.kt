@@ -236,7 +236,11 @@ private fun flashWithIO(
         }
     }
 
-    return Shell.cmd(cmd).to(stdoutCallback, stderrCallback).exec()
+    val result = withNewRootShell {
+        newJob().add(cmd).to(stdoutCallback, stderrCallback).exec()
+    }
+    Log.i(TAG, "flashWithIO cmd=$cmd code=${result.code} out=${result.out} err=${result.err}")
+    return result
 }
 
 fun flashModule(
