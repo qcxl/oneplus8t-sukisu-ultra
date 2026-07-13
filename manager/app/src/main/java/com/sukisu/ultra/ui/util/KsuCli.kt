@@ -49,6 +49,7 @@ data class FlashResult(val code: Int, val err: String, val showReboot: Boolean) 
     constructor(result: Shell.Result, showReboot: Boolean) : this(result.code, result.err.joinToString("\n"), showReboot)
     constructor(result: Shell.Result) : this(result, result.isSuccess)
     constructor(result: FlashIOResult) : this(result.code, result.err.joinToString("\n"), result.isSuccess)
+    constructor(result: FlashIOResult, showReboot: Boolean) : this(result.code, result.err.joinToString("\n"), showReboot)
 }
 
 object KsuCli {
@@ -219,7 +220,7 @@ fun uninstallModule(id: String): Boolean {
     return result
 }
 
-private data class FlashIOResult(
+data class FlashIOResult(
     val code: Int,
     val out: List<String>,
     val err: List<String>,
