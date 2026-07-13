@@ -48,6 +48,7 @@ fun getKsuDaemonPath(): String {
 data class FlashResult(val code: Int, val err: String, val showReboot: Boolean) {
     constructor(result: Shell.Result, showReboot: Boolean) : this(result.code, result.err.joinToString("\n"), showReboot)
     constructor(result: Shell.Result) : this(result, result.isSuccess)
+    constructor(result: FlashIOResult) : this(result.code, result.err.joinToString("\n"), result.isSuccess)
 }
 
 object KsuCli {
@@ -218,29 +219,56 @@ fun uninstallModule(id: String): Boolean {
     return result
 }
 
+private data class FlashIOResult(
+    val code: Int,
+    val out: List<String>,
+    val err: List<String>,
+) {
+    val isSuccess: Boolean get() = code == 0
+
+    constructor(result: Shell.Result) : this(result.code, result.out, result.err)
+}
+
 private fun flashWithIO(
     cmd: String,
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit
-): Shell.Result {
+): FlashIOResult {
+    // Use su -c to run the command directly (avoids libsu Shell's output capture issues
+    // with the sh -c chain). The ksud binary's stdout/stderr are read directly from the
+    // process streams.
+    return try {
+        val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
+        val stdoutLines = mutableListOf<String>()
+        val stderrLines = mutableListOf<String>()
 
-    val stdoutCallback: CallbackList<String?> = object : CallbackList<String?>() {
-        override fun onAddElement(s: String?) {
-            onStdout(s ?: "")
-        }
-    }
+        Thread {
+            proc.inputStream.bufferedReader().useLines { lines ->
+                lines.forEach { line ->
+                    synchronized(stdoutLines) { stdoutLines.add(line) }
+                    onStdout(line)
+                }
+            }
+        }.apply { isDaemon = true }.start()
 
-    val stderrCallback: CallbackList<String?> = object : CallbackList<String?>() {
-        override fun onAddElement(s: String?) {
-            onStderr(s ?: "")
-        }
-    }
+        Thread {
+            proc.errorStream.bufferedReader().useLines { lines ->
+                lines.forEach { line ->
+                    synchronized(stderrLines) { stderrLines.add(line) }
+                    onStderr(line)
+                }
+            }
+        }.apply { isDaemon = true }.start()
 
-    val result = withNewRootShell {
-        newJob().add(cmd).to(stdoutCallback, stderrCallback).exec()
+        val code = proc.waitFor()
+        val out = synchronized(stdoutLines) { stdoutLines.toList() }
+        val err = synchronized(stderrLines) { stderrLines.toList() }
+        Log.i(TAG, "flashWithIO cmd=$cmd code=$code out=$out err=$err")
+        FlashIOResult(code = code, out = out, err = err)
+    } catch (e: Exception) {
+        Log.e(TAG, "flashWithIO failed: cmd=$cmd", e)
+        FlashIOResult(code = -1, out = emptyList(), err = listOf(e.toString()))
     }
-    Log.i(TAG, "flashWithIO cmd=$cmd code=${result.code} out=${result.out} err=${result.err}")
-    return result
 }
 
 fun flashModule(
