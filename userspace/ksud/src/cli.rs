@@ -743,11 +743,17 @@ pub enum SusfsConfigCmd {
 }
 
 pub fn run() -> Result<()> {
-    // DIAG: write to app cache (same dir the zip file is in) — guaranteed writable.
-    let _ = std::fs::write(
-        "/data/user/0/com.sukisu.ultra/cache/ksud_debug.log",
-        "run(): started\n",
-    );
+    // DIAG: write to two locations — app cache (always writable) and
+    // /data/local/tmp (readable via adb — may be blocked by SELinux).
+    let diag = |msg: &str| {
+        let _ = std::fs::write(
+            "/data/user/0/com.sukisu.ultra/cache/ksud_debug.log",
+            msg.as_bytes(),
+        );
+        // Second copy to world-readable location (may fail SELinux — that's OK)
+        let _ = std::fs::write("/data/local/tmp/ksud_debug.log", msg.as_bytes());
+    };
+    diag("run(): started\n");
     android_logger::init_once(
         Config::default()
             .with_max_level(crate::debug_select!(LevelFilter::Trace, LevelFilter::Info))
@@ -781,21 +787,12 @@ pub fn run() -> Result<()> {
         Commands::Insmod { module, params } => debug::insmod(&module, &params),
 
         Commands::Module { command } => {
-            let _ = std::fs::write(
-                "/data/user/0/com.sukisu.ultra/cache/ksud_debug.log",
-                "Module::Install enter\n",
-            );
+            diag("Module::Install enter\n");
             utils::switch_mnt_ns(1)?;
-            let _ = std::fs::write(
-                "/data/user/0/com.sukisu.ultra/cache/ksud_debug.log",
-                "switch_mnt_ns OK\n",
-            );
+            diag("switch_mnt_ns OK\n");
             match command {
                 Module::Install { zip } => {
-                    let _ = std::fs::write(
-                        "/data/user/0/com.sukisu.ultra/cache/ksud_debug.log",
-                        "reached Module::Install\n",
-                    );
+                    diag("reached Module::Install\n");
                     println!("DIAG: before switch_mnt_ns");
                     let ns_result = utils::switch_mnt_ns(1);
                     println!("DIAG: switch_mnt_ns result={}", ns_result.is_ok());
