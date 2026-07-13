@@ -237,9 +237,12 @@ private fun flashWithIO(
 ): FlashIOResult {
     // Use libsu Shell.cmd() which runs commands through the default root shell (via su).
     // This is the same approach as KernelSU-Next.
+    Log.i(TAG, "flashWithIO: cmd=$cmd (len=${cmd.length})")
     val stdoutLines = mutableListOf<String>()
     val stderrLines = mutableListOf<String>()
 
+    val isAlive = Shell.isAlive
+    Log.i(TAG, "flashWithIO: Shell.isAlive=$isAlive")
     val result = Shell.cmd(cmd).to(
         object : CallbackList<String?>() {
             override fun onAddElement(s: String?) {
@@ -259,7 +262,16 @@ private fun flashWithIO(
 
     val out = synchronized(stdoutLines) { stdoutLines.toList() }
     val err = synchronized(stderrLines) { stderrLines.toList() }
-    Log.i(TAG, "flashWithIO cmd=$cmd code=${result.code} out=$out err=$err")
+    Log.i(TAG, "flashWithIO: code=${result.code}, out_lines=${out.size}, err_lines=${err.size}")
+    if (out.isNotEmpty()) {
+        Log.d(TAG, "flashWithIO stdout head: ${out.take(5).joinToString(" | ")}")
+    }
+    if (err.isNotEmpty()) {
+        Log.e(TAG, "flashWithIO stderr: ${err.joinToString("; ")}")
+    }
+    if (result.code != 0) {
+        Log.e(TAG, "flashWithIO FAILED: code=${result.code}, err=${err.joinToString("; ")}")
+    }
     return FlashIOResult(code = result.code, out = out, err = err)
 }
 
@@ -268,19 +280,24 @@ fun flashModule(
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit
 ): FlashResult {
+    Log.i(TAG, "flashModule: uri=$uri")
     val resolver = ksuApp.contentResolver
     val inputStream = resolver.openInputStream(uri)
         ?: throw IllegalArgumentException("Cannot open input stream for $uri")
     inputStream.use { stream ->
         val file = File(ksuApp.cacheDir, "module.zip")
+        Log.i(TAG, "flashModule: copying zip to cache: ${file.absolutePath}")
         file.outputStream().use { output ->
-            stream.copyTo(output)
+            val bytesCopied = stream.copyTo(output)
+            Log.i(TAG, "flashModule: zip copied ($bytesCopied bytes)")
         }
         val cmd = "module install ${file.absolutePath}"
+        Log.i(TAG, "flashModule: executing: ${getKsuDaemonPath()} $cmd")
         val result = flashWithIO("${getKsuDaemonPath()} $cmd", onStdout, onStderr)
-        Log.i("KernelSU", "install module $uri result: $result")
+        Log.i(TAG, "install module $uri result: code=${result.code}, err=${result.err}")
 
         file.delete()
+        Log.i(TAG, "flashModule: temp zip deleted")
 
         return FlashResult(result)
     }

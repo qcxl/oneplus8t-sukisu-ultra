@@ -11,6 +11,7 @@ static DRIVER_FD: OnceLock<RawFd> = OnceLock::new();
 static INFO_CACHE: OnceLock<ksu_uapi::ksu_get_info_cmd> = OnceLock::new();
 
 fn scan_driver_fd() -> Option<RawFd> {
+    log::debug!("scan_driver_fd: scanning /proc/self/fd for [ksu_driver]");
     let fd_dir = fs::read_dir("/proc/self/fd").ok()?;
 
     for entry in fd_dir.flatten() {
@@ -18,13 +19,16 @@ fn scan_driver_fd() -> Option<RawFd> {
             let link_path = format!("/proc/self/fd/{fd_num}");
             if let Ok(target) = fs::read_link(&link_path) {
                 let target_str = target.to_string_lossy();
+                log::trace!("scan_driver_fd: fd={}, target={}", fd_num, target_str);
                 if target_str.contains("[ksu_driver]") {
+                    log::info!("scan_driver_fd: found ksu_driver at fd={}", fd_num);
                     return Some(fd_num);
                 }
             }
         }
     }
 
+    log::warn!("scan_driver_fd: no [ksu_driver] found in /proc/self/fd");
     None
 }
 
@@ -34,14 +38,11 @@ fn init_driver_fd() -> Option<RawFd> {
     if fd.is_none() {
         let mut fd: i32 = -1;
         unsafe {
-            // Use SYS_reboot to match KernelSU-Next kernel's kprobe-based fd
-            // installation. The kernel intercepts the reboot syscall via a
-            // kprobe and installs the ksu driver fd when magic1/magic2 match.
-            // When ksud runs as root (via su), seccomp does not apply, so
-            // SYS_reboot works. When ksud runs as untrusted_app (e.g. during
-            // `ksud debug su` before the su fallback), seccomp blocks
-            // SYS_reboot with SIGSYS — but the shell's `|| su` fallback
-            // handles this, so root is still obtained.
+            log::info!(
+                "init_driver_fd: Calling SYS_reboot(magic1={:#x}, magic2={:#x})",
+                ksu_uapi::KSU_INSTALL_MAGIC1,
+                ksu_uapi::KSU_INSTALL_MAGIC2
+            );
             libc::syscall(
                 libc::SYS_reboot,
                 ksu_uapi::KSU_INSTALL_MAGIC1,
@@ -51,8 +52,16 @@ fn init_driver_fd() -> Option<RawFd> {
                 &mut fd,
             );
         };
-        if fd >= 0 { Some(fd) } else { None }
+        if fd >= 0 {
+            log::info!("init_driver_fd: SYS_reboot returned fd={}", fd);
+            Some(fd)
+        } else {
+            let err = unsafe { *libc::__errno() };
+            log::error!("init_driver_fd: SYS_reboot failed (errno={}), fd stays -1", err);
+            None
+        }
     } else {
+        log::info!("init_driver_fd: using existing fd from /proc/self/fd");
         fd
     }
 }
@@ -61,12 +70,19 @@ fn init_driver_fd() -> Option<RawFd> {
 pub fn ksuctl<T>(request: u32, arg: *mut T) -> std::io::Result<i32> {
     use std::io;
 
-    let fd = *DRIVER_FD.get_or_init(|| init_driver_fd().unwrap_or(-1));
+    let fd = *DRIVER_FD.get_or_init(|| {
+        log::debug!("ksuctl: first call, initializing DRIVER_FD");
+        init_driver_fd().unwrap_or(-1)
+    });
     unsafe {
+        log::trace!("ksuctl: ioctl(fd={fd}, request={request:#x}, arg={:p})", arg);
         let ret = libc::ioctl(fd as libc::c_int, request as i32, arg);
         if ret < 0 {
-            Err(io::Error::last_os_error())
+            let err = io::Error::last_os_error();
+            log::error!("ksuctl FAILED (fd={}, request={:#x}): {}", fd, request, err);
+            Err(err)
         } else {
+            log::trace!("ksuctl OK (fd={}, request={:#x}): {}", fd, request, ret);
             Ok(ret)
         }
     }
@@ -75,6 +91,7 @@ pub fn ksuctl<T>(request: u32, arg: *mut T) -> std::io::Result<i32> {
 // API implementations
 pub fn get_info() -> ksu_uapi::ksu_get_info_cmd {
     *INFO_CACHE.get_or_init(|| {
+        log::debug!("get_info: first call, querying kernel via KSU_IOCTL_GET_INFO...");
         let mut cmd = ksu_uapi::ksu_get_info_cmd {
             version: 0,
             flags: 0,
@@ -82,8 +99,13 @@ pub fn get_info() -> ksu_uapi::ksu_get_info_cmd {
             uapi_version: 0,
         };
         if ksuctl(ksu_uapi::KSU_IOCTL_GET_INFO, &raw mut cmd).is_err() {
+            log::warn!("get_info: KSU_IOCTL_GET_INFO failed, trying legacy...");
             let _ = ksuctl(ksu_uapi::KSU_IOCTL_GET_INFO_LEGACY, &raw mut cmd);
         }
+        log::info!(
+            "get_info: version={}, flags={:#x}, uapi_version={}, features={:#x}",
+            cmd.version, cmd.flags, cmd.uapi_version, cmd.features
+        );
         cmd
     })
 }
@@ -117,11 +139,20 @@ pub fn runtime_mode() -> &'static str {
 pub fn ensure_uapi_version_matched() -> anyhow::Result<()> {
     let kernel_uapi = get_info().uapi_version;
     let userspace_uapi = uapi_version();
+    log::info!(
+        "ensure_uapi_version_matched: kernel_uapi={}, userspace_uapi={}",
+        kernel_uapi, userspace_uapi
+    );
     if kernel_uapi != userspace_uapi {
+        log::error!(
+            "UAPI MISMATCH: kernel={} != userspace={}. Module install will FAIL!",
+            kernel_uapi, userspace_uapi
+        );
         bail!(
             "UAPI version mismatch: kernel={kernel_uapi}, ksud={userspace_uapi}. Please update KernelSU!"
         );
     }
+    log::info!("ensure_uapi_version_matched: UAPI version matched ({})", kernel_uapi);
     Ok(())
 }
 

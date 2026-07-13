@@ -67,11 +67,48 @@ pub fn ensure_file_exists<T: AsRef<Path>>(file: T) -> Result<()> {
 }
 
 pub fn ensure_dir_exists<T: AsRef<Path>>(dir: T) -> Result<()> {
-    let result = create_dir_all(&dir);
-    if dir.as_ref().is_dir() && result.is_ok() {
+    let dir = dir.as_ref();
+    log::debug!("ensure_dir_exists: path={}", dir.display());
+
+    // Already exists and is a directory?
+    if dir.is_dir() {
+        log::debug!("ensure_dir_exists: {} already exists, ok", dir.display());
+        return Ok(());
+    }
+
+    log::info!("ensure_dir_exists: {} does not exist, creating...", dir.display());
+    if let Err(e) = create_dir_all(dir) {
+        log::warn!("ensure_dir_exists: create_dir_all({}) FAILED: {}", dir.display(), e);
+        // Fallback: use shell mkdir -p (handles SELinux/mount namespace quirks)
+        let fallback_cmd = format!("mkdir -p '{}'", dir.display());
+        log::warn!("ensure_dir_exists: falling back to '{}'", fallback_cmd);
+        let output = Command::new("sh")
+            .args(["-c", &fallback_cmd])
+            .output()
+            .map_err(|e| anyhow::anyhow!("mkdir -p subprocess failed: {}", e))
+            .with_context(|| format!("mkdir -p {} failed", dir.display()))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            log::error!(
+                "ensure_dir_exists: mkdir -p {} FAILED (exit={}), stderr={}",
+                dir.display(),
+                output.status.code().unwrap_or(-1),
+                stderr
+            );
+            bail!("mkdir -p {} failed: {}", dir.display(), stderr);
+        }
+        log::info!("ensure_dir_exists: mkdir -p {} succeeded", dir.display());
+    } else {
+        log::debug!("ensure_dir_exists: create_dir_all({}) succeeded", dir.display());
+    }
+
+    // Final verification
+    if dir.is_dir() {
+        log::info!("ensure_dir_exists: {} is now a valid directory", dir.display());
         Ok(())
     } else {
-        bail!("{} is not a regular directory", dir.as_ref().display())
+        log::error!("ensure_dir_exists: {} STILL not a directory after all attempts!", dir.display());
+        bail!("{} is not a regular directory (all methods failed)", dir.display())
     }
 }
 

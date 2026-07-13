@@ -5,6 +5,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.Parcelable
+import android.util.Log
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Adb
 import androidx.compose.material.icons.rounded.DeleteForever
@@ -96,13 +97,18 @@ fun flashModulesSequentially(
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit
 ): FlashResult {
-    for (uri in uris) {
+    Log.i("FlashUtils", "flashModulesSequentially: processing ${uris.size} uris")
+    for ((index, uri) in uris.withIndex()) {
+        Log.i("FlashUtils", "flashing module ${index + 1}/${uris.size}: uri=$uri")
         flashModule(uri, onStdout, onStderr).apply {
             if (code != 0) {
+                Log.e("FlashUtils", "module ${index + 1}/${uris.size} FAILED: code=$code, err=$err")
                 return FlashResult(code, err, showReboot)
             }
+            Log.i("FlashUtils", "module ${index + 1}/${uris.size} succeeded")
         }
     }
+    Log.i("FlashUtils", "flashModulesSequentially: all modules succeeded")
     return FlashResult(0, "", true)
 }
 
@@ -111,6 +117,7 @@ fun flashIt(
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit
 ): FlashResult {
+    Log.i("FlashUtils", "flashIt dispatch: type=${flashIt.javaClass.simpleName}")
     return when (flashIt) {
         is FlashIt.FlashBoot -> installBoot(
             flashIt.boot,
@@ -147,8 +154,10 @@ fun FlashEffect(
 ) {
     LaunchedEffect(enabled) {
         if (!enabled || text.isNotEmpty()) {
+            Log.i("FlashEffect", "skipped: enabled=$enabled, textNotEmpty=${text.isNotEmpty()}")
             return@LaunchedEffect
         }
+        Log.i("FlashEffect", "starting flash: type=${flashIt.javaClass.simpleName}, flashIt=$flashIt")
         var currentText = text
         val mainHandler = Handler(Looper.getMainLooper())
         withContext(Dispatchers.IO) {
@@ -166,11 +175,15 @@ fun FlashEffect(
             }, onStderr = {
                 logContent.append(it).append("\n")
             }).apply {
+                Log.i("FlashEffect", "flash complete: code=$code, showReboot=$showReboot, err='$err'")
                 if (code != 0) {
+                    Log.e("FlashEffect", "FLASH FAILED: code=$code, err='$err'")
                     currentText += "Error code: $code.\n $err Please save and check the log.\n"
                     mainHandler.post {
                         onTextUpdate(currentText)
                     }
+                } else {
+                    Log.i("FlashEffect", "FLASH SUCCEEDED")
                 }
                 if (showReboot) {
                     currentText += "\n\n\n"
