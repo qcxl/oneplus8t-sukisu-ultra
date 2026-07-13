@@ -929,13 +929,15 @@ fn install_module_to_system(zip: &str) -> Result<()> {
 pub fn install_module(zip: &str) -> Result<()> {
     // Use println! for DIAGNOSTICS: goes to stdout → captured by flashWithIO
     // and shown in the app's flash UI.  info!() goes to logcat.
+    let _ = std::fs::write("/data/local/tmp/ksud_debug.log", "install_module entered\n");
     println!("install_module: entered, zip={zip}");
     info!("install_module: START, zip={zip}");
 
+    let _ = std::fs::write("/data/local/tmp/ksud_debug.log", "about to check UAPI\n");
     info!("install_module: checking UAPI version match...");
     ksucalls::ensure_uapi_version_matched()?;
+    let _ = std::fs::write("/data/local/tmp/ksud_debug.log", "UAPI check passed\n");
     println!("install_module: UAPI check passed");
-    info!("install_module: UAPI check passed, proceeding to install...");
 
     let result = install_module_to_system(zip);
     if let Err(ref e) = result {

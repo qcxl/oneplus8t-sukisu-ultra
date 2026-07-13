@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use android_logger::Config;
 use log::{LevelFilter, error, info};
+use std::io::Write;
 
 use crate::boot_patch::{BootPatchArgs, BootRestoreArgs};
 use crate::module::regenerate_preinit_rc;
@@ -743,6 +744,9 @@ pub enum SusfsConfigCmd {
 }
 
 pub fn run() -> Result<()> {
+    // DIAG: write to file immediately on start — stdout/stderr may be piped
+    // and lost if the process crashes before flushing.
+    let _ = std::fs::write("/data/local/tmp/ksud_debug.log", "run(): started\n");
     android_logger::init_once(
         Config::default()
             .with_max_level(crate::debug_select!(LevelFilter::Trace, LevelFilter::Info))
@@ -776,10 +780,15 @@ pub fn run() -> Result<()> {
         Commands::Insmod { module, params } => debug::insmod(&module, &params),
 
         Commands::Module { command } => {
+            let _ = std::fs::write("/data/local/tmp/ksud_debug.log", "Module::Install enter\n");
             utils::switch_mnt_ns(1)?;
+            let _ = std::fs::write("/data/local/tmp/ksud_debug.log", "switch_mnt_ns OK\n");
             match command {
                 Module::Install { zip } => {
-                    // DIAG: print before and after switch_mnt_ns
+                    let _ = std::fs::write(
+                        "/data/local/tmp/ksud_debug.log",
+                        "reached Module::Install\n",
+                    );
                     println!("DIAG: before switch_mnt_ns");
                     let ns_result = utils::switch_mnt_ns(1);
                     println!("DIAG: switch_mnt_ns result={}", ns_result.is_ok());
