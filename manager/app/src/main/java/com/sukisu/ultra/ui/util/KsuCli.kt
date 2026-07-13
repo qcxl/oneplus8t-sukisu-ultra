@@ -235,13 +235,17 @@ private fun flashWithIO(
     onStdout: (String) -> Unit,
     onStderr: (String) -> Unit
 ): FlashIOResult {
-    // Use libsu Shell.cmd() which runs commands through the default root shell (via su).
-    // This is the same approach as KernelSU-Next.
+    // Use getRootShell() instead of Shell.cmd() — matches how listModules,
+    // toggleModule, and all other ksud commands work in this app.
+    // Shell.cmd() relies on the global Shell.setDefaultBuilder, but that
+    // creates the shell with `setCommands("sh", "-c", ...)` which exits
+    // immediately, preventing subsequent Shell.cmd() calls from working.
     Log.i(TAG, "flashWithIO: cmd=$cmd (len=${cmd.length})")
     val stdoutLines = mutableListOf<String>()
     val stderrLines = mutableListOf<String>()
 
-    val result = Shell.cmd(cmd).to(
+    val shell = getRootShell()
+    val result = shell.newJob().add(cmd).to(
         object : CallbackList<String?>() {
             override fun onAddElement(s: String?) {
                 val line = s ?: ""
