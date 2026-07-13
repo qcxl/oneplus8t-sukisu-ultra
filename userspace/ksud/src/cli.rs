@@ -779,9 +779,16 @@ pub fn run() -> Result<()> {
             utils::switch_mnt_ns(1)?;
             match command {
                 Module::Install { zip } => {
-                    // DIAG: if this doesn't print, the crash is before install_module
+                    // DIAG: print before and after switch_mnt_ns
+                    println!("DIAG: before switch_mnt_ns");
+                    let ns_result = utils::switch_mnt_ns(1);
+                    println!("DIAG: switch_mnt_ns result={}", ns_result.is_ok());
+                    ns_result?;
+                    println!("DIAG: before install_module, zip={zip}");
                     log::info!("dispatch Module::Install: zip={zip}");
-                    module::install_module(&zip)
+                    let result = module::install_module(&zip);
+                    println!("DIAG: install_module result={}", result.is_ok());
+                    result
                 }
                 Module::UndoUninstall { id } => module::undo_uninstall_module(&id),
                 Module::Uninstall { id } => module::uninstall_module(&id),
