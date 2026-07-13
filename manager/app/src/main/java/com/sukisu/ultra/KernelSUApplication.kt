@@ -9,7 +9,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import com.sukisu.ultra.data.repository.SettingsRepositoryImpl
+import com.sukisu.ultra.ui.util.createRootShellBuilder
 import com.sukisu.ultra.ui.viewmodel.SuperUserViewModel
+import com.topjohnwu.superuser.Shell
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import org.lsposed.hiddenapibypass.HiddenApiBypass
@@ -40,6 +42,9 @@ class KernelSUApplication : Application(), ViewModelStoreOwner {
     override fun onCreate() {
         super.onCreate()
         ksuApp = this
+
+        Shell.setDefaultBuilder(createRootShellBuilder(true))
+        Shell.enableVerboseLogging = BuildConfig.DEBUG
 
         if (!isUserUnlocked()) {
             return

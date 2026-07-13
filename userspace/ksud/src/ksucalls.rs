@@ -34,17 +34,21 @@ fn init_driver_fd() -> Option<RawFd> {
     if fd.is_none() {
         let mut fd: i32 = -1;
         unsafe {
-            // Use prctl instead of SYS_reboot: seccomp blocks __NR_reboot for
-            // untrusted_app processes, killing libksud.so with SIGSYS before the
-            // kernel's reboot kprobe ever runs. prctl(0xDEADBEEF, ...) bypasses
-            // seccomp and installs the fd in the calling process via the kernel's
-            // ksu_handle_prctl hook (injected into kernel/sys.c by CI).
-            libc::prctl(
-                ksu_uapi::KSU_INSTALL_MAGIC1 as libc::c_int,
-                ksu_uapi::KSU_INSTALL_MAGIC2 as libc::c_ulong,
-                &mut fd as *mut i32 as libc::c_ulong,
+            // Use SYS_reboot to match KernelSU-Next kernel's kprobe-based fd
+            // installation. The kernel intercepts the reboot syscall via a
+            // kprobe and installs the ksu driver fd when magic1/magic2 match.
+            // When ksud runs as root (via su), seccomp does not apply, so
+            // SYS_reboot works. When ksud runs as untrusted_app (e.g. during
+            // `ksud debug su` before the su fallback), seccomp blocks
+            // SYS_reboot with SIGSYS — but the shell's `|| su` fallback
+            // handles this, so root is still obtained.
+            libc::syscall(
+                libc::SYS_reboot,
+                ksu_uapi::KSU_INSTALL_MAGIC1,
+                ksu_uapi::KSU_INSTALL_MAGIC2,
                 0,
                 0,
+                &mut fd,
             );
         };
         if fd >= 0 { Some(fd) } else { None }

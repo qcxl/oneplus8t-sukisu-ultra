@@ -536,28 +536,24 @@ fun setSepolicy(pkg: String, rules: String): Boolean {
 }
 
 fun listAppProfileTemplates(): List<String> {
-    val shell = getRootShell()
-    val out = shell.newJob().add("${getKsuDaemonPath()} profile list-templates")
-        .to(ArrayList<String>(), null).exec().out
-    return out.filter { it.isNotBlank() }
+    return Shell.cmd("${getKsuDaemonPath()} profile list-templates").to(ArrayList<String>(), null)
+        .exec().out
 }
 
 fun getAppProfileTemplate(id: String): String {
-    val shell = getRootShell()
-    val out = shell.newJob().add("${getKsuDaemonPath()} profile get-template '$id'")
-        .to(ArrayList<String>(), null).exec().out
-    return out.joinToString("\n").trim()
+    return Shell.cmd("${getKsuDaemonPath()} profile get-template '${id}'")
+        .to(ArrayList<String>(), null).exec().out.joinToString("\n").trim()
 }
 
 fun setAppProfileTemplate(id: String, template: String): Boolean {
-    val escaped = template.replace("'", "'\\''")
-    val shell = getRootShell()
-    return ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} profile set-template '$id' '$escaped'")
+    val escapedTemplate = template.replace("\"", "\\\"")
+    val cmd = """${getKsuDaemonPath()} profile set-template "$id" "$escapedTemplate""""
+    return Shell.cmd(cmd).to(ArrayList<String>(), null).exec().isSuccess
 }
 
 fun deleteAppProfileTemplate(id: String): Boolean {
-    val shell = getRootShell()
-    return ShellUtils.fastCmdResult(shell, "${getKsuDaemonPath()} profile delete-template '$id'")
+    return Shell.cmd("${getKsuDaemonPath()} profile delete-template '${id}'")
+        .to(ArrayList<String>(), null).exec().isSuccess
 }
 
 fun forceStopApp(packageName: String, userId: Int? = null) {
