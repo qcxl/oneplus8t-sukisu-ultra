@@ -241,8 +241,6 @@ private fun flashWithIO(
     val stdoutLines = mutableListOf<String>()
     val stderrLines = mutableListOf<String>()
 
-    val isAlive = Shell.isAlive
-    Log.i(TAG, "flashWithIO: Shell.isAlive=$isAlive")
     val result = Shell.cmd(cmd).to(
         object : CallbackList<String?>() {
             override fun onAddElement(s: String?) {
