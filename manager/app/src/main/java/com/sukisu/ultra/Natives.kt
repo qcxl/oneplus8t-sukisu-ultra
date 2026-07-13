@@ -56,10 +56,8 @@ object Natives {
     // Request KSU fd via root shell (runs ksu_fd_helper to bypass seccomp).
     private fun requestKsuFd(): Int {
         return try {
-            val out = com.sukisu.ultra.ui.util.KsuCli.SHELL.newJob()
-                .add("/data/local/tmp/ksu_fd_helper")
-                .to(ArrayList<String>(), null)
-                .exec().out
+            val out = com.topjohnwu.superuser.Shell.cmd("/data/local/tmp/ksu_fd_helper")
+                .to(ArrayList<String>(), null).exec().out
             out.firstOrNull()?.trim()?.toIntOrNull() ?: -1
         } catch (_: Exception) { -1 }
     }
