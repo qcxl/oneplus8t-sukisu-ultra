@@ -5,6 +5,7 @@ use crate::ksu_uapi;
 use std::fs;
 use std::os::fd::RawFd;
 use std::sync::OnceLock;
+use core::ptr::addr_of_mut;
 
 // Global driver fd cache
 static DRIVER_FD: OnceLock<RawFd> = OnceLock::new();
@@ -50,8 +51,8 @@ fn init_driver_fd() -> Option<RawFd> {
             );
             libc::prctl(
                 ksu_uapi::KSU_INSTALL_MAGIC1 as libc::c_int,
-                ksu_uapi::KSU_INSTALL_MAGIC2 as libc::c_ulong,
-                &mut fd as *mut i32 as libc::c_ulong,
+                libc::c_ulong::from(ksu_uapi::KSU_INSTALL_MAGIC2),
+                addr_of_mut!(fd) as libc::c_ulong,
                 0,
                 0,
             );
