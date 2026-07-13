@@ -711,6 +711,7 @@ pub fn handle_updated_modules() -> Result<()> {
 }
 
 fn install_module_to_system(zip: &str) -> Result<()> {
+    println!("install_module_to_system: START, zip={zip}");
     info!("install_module_to_system: START, zip={}", zip);
 
     ensure_boot_completed()?;
@@ -926,10 +927,14 @@ fn install_module_to_system(zip: &str) -> Result<()> {
 }
 
 pub fn install_module(zip: &str) -> Result<()> {
-    info!("install_module: START, zip={}", zip);
+    // Use println! for DIAGNOSTICS: goes to stdout → captured by flashWithIO
+    // and shown in the app's flash UI.  info!() goes to logcat.
+    println!("install_module: entered, zip={zip}");
+    info!("install_module: START, zip={zip}");
 
     info!("install_module: checking UAPI version match...");
     ksucalls::ensure_uapi_version_matched()?;
+    println!("install_module: UAPI check passed");
     info!("install_module: UAPI check passed, proceeding to install...");
 
     let result = install_module_to_system(zip);
