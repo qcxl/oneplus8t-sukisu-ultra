@@ -236,9 +236,7 @@ private fun flashWithIO(
         }
     }
 
-    return withNewRootShell {
-        newJob().add(cmd).to(stdoutCallback, stderrCallback).exec()
-    }
+    return Shell.cmd(cmd).to(stdoutCallback, stderrCallback).exec()
 }
 
 fun flashModule(
@@ -279,10 +277,8 @@ fun runModuleAction(
         }
     }
 
-    val result = withNewRootShell(true) {
-        newJob().add("${getKsuDaemonPath()} module action $moduleId")
-            .to(stdoutCallback, stderrCallback).exec()
-    }
+    val result = Shell.cmd("${getKsuDaemonPath()} module action $moduleId")
+        .to(stdoutCallback, stderrCallback).exec()
 
     Log.i("KernelSU", "Module runAction result: $result")
 
