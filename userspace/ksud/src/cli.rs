@@ -743,9 +743,11 @@ pub enum SusfsConfigCmd {
 }
 
 pub fn run() -> Result<()> {
-    // DIAG: write to file immediately on start — stdout/stderr may be piped
-    // and lost if the process crashes before flushing.
-    let _ = std::fs::write("/data/local/tmp/ksud_debug.log", "run(): started\n");
+    // DIAG: write to app cache (same dir the zip file is in) — guaranteed writable.
+    let _ = std::fs::write(
+        "/data/user/0/com.sukisu.ultra/cache/ksud_debug.log",
+        "run(): started\n",
+    );
     android_logger::init_once(
         Config::default()
             .with_max_level(crate::debug_select!(LevelFilter::Trace, LevelFilter::Info))
@@ -779,13 +781,19 @@ pub fn run() -> Result<()> {
         Commands::Insmod { module, params } => debug::insmod(&module, &params),
 
         Commands::Module { command } => {
-            let _ = std::fs::write("/data/local/tmp/ksud_debug.log", "Module::Install enter\n");
+            let _ = std::fs::write(
+                "/data/user/0/com.sukisu.ultra/cache/ksud_debug.log",
+                "Module::Install enter\n",
+            );
             utils::switch_mnt_ns(1)?;
-            let _ = std::fs::write("/data/local/tmp/ksud_debug.log", "switch_mnt_ns OK\n");
+            let _ = std::fs::write(
+                "/data/user/0/com.sukisu.ultra/cache/ksud_debug.log",
+                "switch_mnt_ns OK\n",
+            );
             match command {
                 Module::Install { zip } => {
                     let _ = std::fs::write(
-                        "/data/local/tmp/ksud_debug.log",
+                        "/data/user/0/com.sukisu.ultra/cache/ksud_debug.log",
                         "reached Module::Install\n",
                     );
                     println!("DIAG: before switch_mnt_ns");
